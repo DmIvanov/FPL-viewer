@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPL Cup Standings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="site-title">🏆 FPL Cup Standings</h1>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="#cup" class="nav-link active">Cup Standings</a></li>
+                    <li><a href="#charts" class="nav-link">Performance Charts</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            <section id="cup" class="cup-section">
+                <div class="section-header">
+                    <h2>🏆 FPL Mini League Cup</h2>
+                    <span id="cup-loading" class="loading-spinner" style="display: none;">Loading...</span>
+                </div>
+                
+                <div class="table-container">
+                    <table class="standings-table">
+                        <thead>
+                            <tr>
+                                <th>Pos</th>
+                                <th>Team Name</th>
+                                <th>Manager</th>
+                                <th>Played</th>
+                                <th>Points</th>
+                                <th>Form</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cup-table-body">
+                            <!-- Table content will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="charts" class="charts-section" style="display: none;">
+                <h2>📊 Performance Analysis</h2>
+                <div class="charts-placeholder">
+                    <p>Performance charts coming soon...</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        console.log('🚀 Simple FPL page loaded!');
+        
+        // Mock data for testing
+        const mockData = [
+            { position: 1, entry_name: "Klopp and Glory", player_name: "Sergey Karpin", matches_played: 13, total: 1067, form: "📈" },
+            { position: 2, entry_name: "FC Matveev", player_name: "Alex Matveev", matches_played: 13, total: 928, form: "📊" },
+            { position: 3, entry_name: "Livenko United", player_name: "Igor Livenko", matches_played: 13, total: 884, form: "📉" }
+        ];
+
+        function populateTable(data) {
+            const tableBody = document.getElementById('cup-table-body');
+            if (!tableBody) return;
+            
+            tableBody.innerHTML = data.map(manager => `
+                <tr class="table-row ${manager.position <= 3 ? 'top-position' : ''}">
+                    <td class="position">${manager.position}</td>
+                    <td class="team-name">${manager.entry_name}</td>
+                    <td class="manager-name">${manager.player_name}</td>
+                    <td class="matches-played">${manager.matches_played}</td>
+                    <td class="points">${manager.total.toLocaleString()}</td>
+                    <td class="form">${manager.form}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('✅ Loading mock FPL data...');
+            populateTable(mockData);
+        });
+    </script>
+</body>
+</html>

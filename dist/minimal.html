@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal FPL Test</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header Section -->
+    <header class="header">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>Friends Premier League</h1>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#charts" class="nav-link">Charts</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#cup" class="nav-link">Cup</a>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Cup Section -->
+        <section id="cup" class="content-section">
+            <div class="section-header">
+                <h2>🏆 Mini League Cup</h2>
+                <span id="cup-loading" class="loading-spinner" style="display: none;">Loading...</span>
+            </div>
+            
+            <div class="table-container">
+                <table class="cup-table">
+                    <thead>
+                        <tr>
+                            <th>Pos</th>
+                            <th>Manager</th>
+                            <th>Team</th>
+                            <th>Points</th>
+                            <th>GW</th>
+                            <th>Last</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cup-table-body">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 20px;">
+                                Loading...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section id="charts" class="content-section" style="display: none;">
+            <h2>📊 Performance Charts</h2>
+            <div class="charts-placeholder">
+                <p>Charts coming soon...</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="minimal-script.js"></script>
+</body>
+</html>

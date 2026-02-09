@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friends Premier League - FPL Analytics</title>
+    <meta name="description" content="Fantasy Premier League analytics and statistics for our friends league. Charts, tables, and insights powered by TypeScript.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header Section -->
+    <header class="header">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>Friends Premier League</h1>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#charts" class="nav-link">Charts</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#cup" class="nav-link">Cup</a>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Charts Section -->
+        <section id="charts" class="charts">
+            <div class="container">
+                <!-- Content will be added here -->
+            </div>
+        </section>
+
+        <!-- Cup Section -->
+        <section id="cup" class="cup">
+            <div class="container">
+                <h2>FPL Cup Standings</h2>
+                <div class="loading-indicator" id="cup-loading" style="display: none;">
+                    <span>⏳ Loading standings...</span>
+                </div>
+                
+                <div class="cup-standings-container">
+                    <table class="cup-table" id="cup-table">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Manager</th>
+                                <th>Team Name</th>
+                                <th>Total Points</th>
+                                <th>GW Points</th>
+                                <th>Last Rank</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cup-table-body">
+                            <!-- Cup standings will be populated here -->
+                            <tr>
+                                <td colspan="6" class="loading-message">
+                                    Loading cup standings...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="api-info">
+                    <small>Data from Fantasy Premier League API • League ID: 841567 • Last updated: 2025-12-08</small>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
