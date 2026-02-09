@@ -436,8 +436,25 @@ function populateMatchesPage(element, data) {
 /**
  * Populates Statistics page with charts
  */
+// Global chart renderer instances to manage lifecycle
+let absoluteChartRenderer = null;
+let relativeChartRenderer = null;
 function populateStatisticsPage(element, data) {
     console.log('📊 Populating Statistics page...');
+    // Check if already populated to avoid re-rendering
+    if (element.hasAttribute('data-charts-initialized')) {
+        console.log('✅ Statistics page already initialized, skipping re-render');
+        return;
+    }
+    // Destroy any existing chart instances before recreating HTML
+    if (absoluteChartRenderer) {
+        absoluteChartRenderer.destroy();
+        absoluteChartRenderer = null;
+    }
+    if (relativeChartRenderer) {
+        relativeChartRenderer.destroy();
+        relativeChartRenderer = null;
+    }
     // Create chart HTML structure
     element.innerHTML = `
         <div class="statistics-container">
@@ -480,12 +497,12 @@ function populateStatisticsPage(element, data) {
             const processor = new ChartProcessor(data.matches);
             const chartData = processor.process();
             console.log(`📈 Processed ${chartData.absoluteManagers.length} managers for charts`);
-            // Create chart renderers
-            const absoluteRenderer = new ChartRenderer();
-            const relativeRenderer = new ChartRenderer();
+            // Create chart renderers (store globally for lifecycle management)
+            absoluteChartRenderer = new ChartRenderer();
+            relativeChartRenderer = new ChartRenderer();
             // Render absolute chart (default view)
             console.log('🎨 Rendering absolute chart...');
-            absoluteRenderer.renderChart('absolute-chart', chartData.absoluteManagers, 'absolute', 'absolute-legend');
+            absoluteChartRenderer.renderChart('absolute-chart', chartData.absoluteManagers, 'absolute', 'absolute-legend');
             // Setup chart type switching
             const chartTypeButtons = element.querySelectorAll('.chart-type-btn');
             chartTypeButtons.forEach(button => {
@@ -501,8 +518,8 @@ function populateStatisticsPage(element, data) {
                         absoluteSection?.classList.remove('hidden');
                         relativeSection?.classList.add('hidden');
                         // Render absolute chart if not already rendered
-                        if (!absoluteSection?.hasAttribute('data-rendered')) {
-                            absoluteRenderer.renderChart('absolute-chart', chartData.absoluteManagers, 'absolute', 'absolute-legend');
+                        if (!absoluteSection?.hasAttribute('data-rendered') && absoluteChartRenderer) {
+                            absoluteChartRenderer.renderChart('absolute-chart', chartData.absoluteManagers, 'absolute', 'absolute-legend');
                             absoluteSection?.setAttribute('data-rendered', 'true');
                         }
                     }
@@ -510,9 +527,9 @@ function populateStatisticsPage(element, data) {
                         absoluteSection?.classList.add('hidden');
                         relativeSection?.classList.remove('hidden');
                         // Render relative chart on first view
-                        if (!relativeSection?.hasAttribute('data-rendered')) {
+                        if (!relativeSection?.hasAttribute('data-rendered') && relativeChartRenderer) {
                             console.log('🎨 Rendering relative chart...');
-                            relativeRenderer.renderChart('relative-chart', chartData.relativeManagers, 'relative', 'relative-legend');
+                            relativeChartRenderer.renderChart('relative-chart', chartData.relativeManagers, 'relative', 'relative-legend');
                             relativeSection?.setAttribute('data-rendered', 'true');
                         }
                     }
@@ -521,6 +538,8 @@ function populateStatisticsPage(element, data) {
             // Mark absolute chart as rendered
             const absoluteSection = document.getElementById('absolute-chart-section');
             absoluteSection?.setAttribute('data-rendered', 'true');
+            // Mark the statistics page as initialized
+            element.setAttribute('data-charts-initialized', 'true');
             console.log('✅ Statistics page populated successfully');
         }
         catch (error) {

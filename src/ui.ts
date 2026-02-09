@@ -502,8 +502,28 @@ function populateMatchesPage(element: HTMLElement, data: LeagueDataModel): void 
 /**
  * Populates Statistics page with charts
  */
+// Global chart renderer instances to manage lifecycle
+let absoluteChartRenderer: ChartRenderer | null = null;
+let relativeChartRenderer: ChartRenderer | null = null;
+
 function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): void {
     console.log('📊 Populating Statistics page...');
+    
+    // Check if already populated to avoid re-rendering
+    if (element.hasAttribute('data-charts-initialized')) {
+        console.log('✅ Statistics page already initialized, skipping re-render');
+        return;
+    }
+    
+    // Destroy any existing chart instances before recreating HTML
+    if (absoluteChartRenderer) {
+        absoluteChartRenderer.destroy();
+        absoluteChartRenderer = null;
+    }
+    if (relativeChartRenderer) {
+        relativeChartRenderer.destroy();
+        relativeChartRenderer = null;
+    }
     
     // Create chart HTML structure
     element.innerHTML = `
@@ -552,13 +572,13 @@ function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): vo
             
             console.log(`📈 Processed ${chartData.absoluteManagers.length} managers for charts`);
             
-            // Create chart renderers
-            const absoluteRenderer = new ChartRenderer();
-            const relativeRenderer = new ChartRenderer();
+            // Create chart renderers (store globally for lifecycle management)
+            absoluteChartRenderer = new ChartRenderer();
+            relativeChartRenderer = new ChartRenderer();
             
             // Render absolute chart (default view)
             console.log('🎨 Rendering absolute chart...');
-            absoluteRenderer.renderChart(
+            absoluteChartRenderer.renderChart(
                 'absolute-chart',
                 chartData.absoluteManagers,
                 'absolute',
@@ -584,8 +604,8 @@ function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): vo
                         relativeSection?.classList.add('hidden');
                         
                         // Render absolute chart if not already rendered
-                        if (!absoluteSection?.hasAttribute('data-rendered')) {
-                            absoluteRenderer.renderChart(
+                        if (!absoluteSection?.hasAttribute('data-rendered') && absoluteChartRenderer) {
+                            absoluteChartRenderer.renderChart(
                                 'absolute-chart',
                                 chartData.absoluteManagers,
                                 'absolute',
@@ -598,9 +618,9 @@ function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): vo
                         relativeSection?.classList.remove('hidden');
                         
                         // Render relative chart on first view
-                        if (!relativeSection?.hasAttribute('data-rendered')) {
+                        if (!relativeSection?.hasAttribute('data-rendered') && relativeChartRenderer) {
                             console.log('🎨 Rendering relative chart...');
-                            relativeRenderer.renderChart(
+                            relativeChartRenderer.renderChart(
                                 'relative-chart',
                                 chartData.relativeManagers,
                                 'relative',
@@ -615,6 +635,9 @@ function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): vo
             // Mark absolute chart as rendered
             const absoluteSection = document.getElementById('absolute-chart-section');
             absoluteSection?.setAttribute('data-rendered', 'true');
+            
+            // Mark the statistics page as initialized
+            element.setAttribute('data-charts-initialized', 'true');
             
             console.log('✅ Statistics page populated successfully');
         } catch (error) {

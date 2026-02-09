@@ -7,6 +7,10 @@ const CORS_PROXIES = [
     'https://corsproxy.io/?',
     'https://api.codetabs.com/v1/proxy?quest='
 ];
+// Cache for API responses
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let cachedLeagueData = null;
+let workingProxyIndex = 0; // Remember which proxy works
 /**
  * Fetches real FPL data from the Fantasy Premier League API
  * Uses multiple CORS proxy services for reliability
@@ -78,88 +82,147 @@ export async function fetchRealFPLData() {
     throw new Error('No proxy services available');
 }
 /**
- * Fetches all H2H matches with pagination
- * Loops through all pages until has_next is false
+ * Fetches a single page of H2H matches
  */
-export async function fetchH2HMatches() {
-    console.log('🔍 Fetching H2H League matches with pagination...');
-    const allMatches = [];
-    let currentPage = 1;
-    let hasNext = true;
-    while (hasNext) {
+async function fetchH2HPage(pageNumber) {
+    const pageUrl = `${H2H_API_BASE_URL}?page=${pageNumber}`;
+    // Try working proxy first, then others
+    const proxyOrder = [
+        ...CORS_PROXIES.slice(workingProxyIndex),
+        ...CORS_PROXIES.slice(0, workingProxyIndex)
+    ];
+    for (let i = 0; i < proxyOrder.length; i++) {
+        const proxyUrl = proxyOrder[i];
+        if (!proxyUrl)
+            continue;
         try {
-            const pageUrl = `${H2H_API_BASE_URL}?page=${currentPage}`;
-            console.log(`📄 Fetching page ${currentPage}: ${pageUrl}`);
-            // Try CORS proxies for this page
-            let pageData = null;
-            for (let i = 0; i < CORS_PROXIES.length; i++) {
-                const proxyUrl = CORS_PROXIES[i];
-                if (!proxyUrl)
-                    continue;
-                try {
-                    let fetchUrl;
-                    let processResponse;
-                    if (proxyUrl.includes('allorigins')) {
-                        fetchUrl = `${proxyUrl}${encodeURIComponent(pageUrl)}`;
-                        processResponse = async (response) => {
-                            const data = await response.json();
-                            return JSON.parse(data.contents);
-                        };
-                    }
-                    else {
-                        fetchUrl = `${proxyUrl}${pageUrl}`;
-                        processResponse = async (response) => {
-                            return await response.json();
-                        };
-                    }
-                    const response = await fetch(fetchUrl, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await processResponse(response);
-                    // Validate response structure
-                    if (data && typeof data === 'object' && Array.isArray(data.results)) {
-                        pageData = data;
-                        console.log(`✅ Page ${currentPage}: Found ${data.results.length} matches`);
-                        break; // Success, exit proxy loop
-                    }
-                    else {
-                        throw new Error('Invalid response structure');
-                    }
-                }
-                catch (error) {
-                    console.warn(`❌ Proxy ${i + 1} failed for page ${currentPage}:`, error);
-                    if (i === CORS_PROXIES.length - 1) {
-                        throw new Error(`All proxies failed for page ${currentPage}`);
-                    }
-                }
+            let fetchUrl;
+            let processResponse;
+            if (proxyUrl.includes('allorigins')) {
+                fetchUrl = `${proxyUrl}${encodeURIComponent(pageUrl)}`;
+                processResponse = async (response) => {
+                    const data = await response.json();
+                    return JSON.parse(data.contents);
+                };
             }
-            if (!pageData) {
-                throw new Error(`Failed to fetch page ${currentPage}`);
+            else {
+                fetchUrl = `${proxyUrl}${pageUrl}`;
+                processResponse = async (response) => {
+                    return await response.json();
+                };
             }
-            // Add matches from this page to our collection
-            allMatches.push(...pageData.results);
-            // Check if there are more pages
-            hasNext = pageData.has_next || false;
-            currentPage++;
-            // Small delay to avoid rate limiting
-            if (hasNext) {
-                await new Promise(resolve => setTimeout(resolve, 500));
+            const response = await fetch(fetchUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await processResponse(response);
+            if (data && typeof data === 'object' && Array.isArray(data.results)) {
+                // Remember this working proxy
+                workingProxyIndex = CORS_PROXIES.indexOf(proxyUrl);
+                return data;
+            }
+            else {
+                throw new Error('Invalid response structure');
             }
         }
         catch (error) {
-            console.error(`🚫 Error fetching H2H matches at page ${currentPage}:`, error);
-            throw error;
+            if (i === proxyOrder.length - 1) {
+                throw new Error(`All proxies failed for page ${pageNumber}`);
+            }
+        }
+    }
+    throw new Error(`Failed to fetch page ${pageNumber}`);
+}
+/**
+ * Fetches all H2H matches with parallel pagination and caching
+ * Supports progressive callback for updating UI as data arrives
+ */
+export async function fetchH2HMatches(onProgress) {
+    // Check cache first
+    if (cachedLeagueData && (Date.now() - cachedLeagueData.timestamp) < CACHE_DURATION) {
+        console.log('✨ Using cached League data');
+        if (onProgress) {
+            onProgress(cachedLeagueData.data.matches, true);
+        }
+        return cachedLeagueData.data;
+    }
+    console.log('🔍 Fetching H2H League matches with parallel pagination...');
+    const allMatches = [];
+    // First, fetch page 1 to determine total pages
+    const firstPage = await fetchH2HPage(1);
+    allMatches.push(...firstPage.results);
+    console.log(`✅ Page 1: Found ${firstPage.results.length} matches`);
+    // Notify progress
+    if (onProgress) {
+        onProgress([...allMatches], !firstPage.has_next);
+    }
+    // If there are more pages, fetch them in parallel (batches of 3)
+    if (firstPage.has_next) {
+        let currentPage = 2;
+        let hasNext = true;
+        const BATCH_SIZE = 3; // Fetch 3 pages at a time to avoid overwhelming the API
+        while (hasNext) {
+            const pagesToFetch = [];
+            // Prepare batch of page numbers to fetch
+            for (let i = 0; i < BATCH_SIZE; i++) {
+                pagesToFetch.push(currentPage + i);
+            }
+            try {
+                // Fetch multiple pages in parallel
+                const pageResults = await Promise.all(pagesToFetch.map(pageNum => fetchH2HPage(pageNum).catch(err => {
+                    console.warn(`⚠️ Page ${pageNum} failed:`, err);
+                    return null;
+                })));
+                // Process results
+                hasNext = false;
+                for (let i = 0; i < pageResults.length; i++) {
+                    const pageData = pageResults[i];
+                    if (pageData && pageData.results) {
+                        allMatches.push(...pageData.results);
+                        console.log(`✅ Page ${pagesToFetch[i]}: Found ${pageData.results.length} matches`);
+                        // Check if there are more pages after this batch
+                        if (i === pageResults.length - 1 && pageData.has_next) {
+                            hasNext = true;
+                        }
+                        // Notify progress after each batch
+                        if (onProgress) {
+                            onProgress([...allMatches], !hasNext);
+                        }
+                    }
+                    else {
+                        // If we get a null result, assume we've reached the end
+                        break;
+                    }
+                }
+                currentPage += BATCH_SIZE;
+            }
+            catch (error) {
+                console.error('🚫 Error in parallel fetch:', error);
+                hasNext = false;
+            }
         }
     }
     console.log(`🏆 Successfully fetched all H2H matches: ${allMatches.length} total matches`);
-    return {
+    const result = {
         matches: allMatches,
         totalMatches: allMatches.length,
         lastUpdated: new Date()
     };
+    // Cache the result
+    cachedLeagueData = {
+        data: result,
+        timestamp: Date.now()
+    };
+    return result;
+}
+/**
+ * Clears the cached league data (useful for manual refresh)
+ */
+export function clearLeagueCache() {
+    cachedLeagueData = null;
+    console.log('🗑️ League cache cleared');
 }
 //# sourceMappingURL=api.js.map

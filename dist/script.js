@@ -1,6 +1,6 @@
 // ===== MAIN APPLICATION ENTRY POINT =====
 // Import API layer
-import { fetchRealFPLData, fetchH2HMatches } from './api.js';
+import { fetchRealFPLData, fetchH2HMatches, clearLeagueCache } from './api.js';
 // Import UI layer
 import { setupMobileMenu, setupSmoothScrolling, setupIntersectionObserver, setupKeyboardAccessibility, setupResizeHandler, initializeFPLFeatures, initializeTabSwitching, setupTabSwitchingListeners, showLoadingState, populateCupTable, showLeagueLoadingState, hideLeagueLoadingState, setupLeagueSubtabs } from './ui.js';
 // Import utilities
@@ -21,6 +21,7 @@ function initializeWebsite() {
     initializeFPLFeatures();
     initializeTabSwitching(fetchCupStandings);
     setupTabSwitchingListeners(fetchCupStandings, fetchLeagueData);
+    setupRefreshButton();
     // Auto-load League data on page load
     console.log('🔄 Auto-loading League data on page load...');
     fetchLeagueData();
@@ -36,6 +37,18 @@ window.addEventListener('error', (event) => {
     // In a real project, you might want to report this to an error tracking service
 });
 // ===== DATA FETCHING & COORDINATION =====
+/**
+ * Sets up the refresh button for League data
+ */
+function setupRefreshButton() {
+    const refreshBtn = document.getElementById('refresh-league-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            console.log('🔄 Manual refresh triggered');
+            fetchLeagueData(true);
+        });
+    }
+}
 /**
  * Fetches Cup standings and updates the UI
  * Coordinates between the API layer and UI layer
@@ -74,18 +87,61 @@ async function fetchCupStandings() {
     }
 }
 /**
- * Fetches League H2H data and updates the UI
+ * Fetches League H2H data and updates the UI progressively
  * Coordinates between the API layer and UI layer for the League tab
  */
-async function fetchLeagueData() {
-    console.log('🏆 Fetching League H2H data...');
+async function fetchLeagueData(forceRefresh = false) {
+    console.log(`🏆 Fetching League H2H data${forceRefresh ? ' (force refresh)' : ''}...`);
+    // Clear cache if force refresh
+    if (forceRefresh) {
+        clearLeagueCache();
+        // Clear chart initialization flag to allow re-rendering
+        const statisticsContent = document.getElementById('statistics-content');
+        if (statisticsContent) {
+            statisticsContent.removeAttribute('data-charts-initialized');
+        }
+    }
     // Show loading state (UI layer)
     showLeagueLoadingState();
     try {
-        // Fetch H2H matches from API with pagination (Network layer)
-        const leagueData = await fetchH2HMatches();
+        // Fetch H2H matches with progressive updates
+        const leagueData = await fetchH2HMatches((matches, isComplete) => {
+            // Update UI progressively as data arrives
+            const progressData = {
+                matches,
+                totalMatches: matches.length,
+                lastUpdated: new Date()
+            };
+            // Update overview with current progress
+            const overviewContent = document.getElementById('overview-content');
+            if (overviewContent) {
+                overviewContent.innerHTML = `
+                    <div class="overview-stats">
+                        <div class="stat-card">
+                            <h4>Total Matches</h4>
+                            <p class="stat-value">${matches.length}${!isComplete ? '...' : ''}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Status</h4>
+                            <p class="stat-value">${isComplete ? '✅ Complete' : '⏳ Loading...'}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>League Type</h4>
+                            <p class="stat-value">Head-to-Head</p>
+                        </div>
+                    </div>
+                    <div class="overview-info">
+                        <p>📊 ${isComplete ? `League data loaded with ${matches.length} matches.` : `Loading matches: ${matches.length}...`}</p>
+                    </div>
+                `;
+            }
+            // If complete, populate all tabs
+            if (isComplete) {
+                setupLeagueSubtabs(progressData);
+            }
+        });
         console.log(`✅ Successfully loaded ${leagueData.matches.length} H2H matches`);
-        // Setup League subtabs and populate with data (UI layer)
+        // Final setup with complete data
         setupLeagueSubtabs(leagueData);
         // Hide loading state
         hideLeagueLoadingState();
@@ -100,8 +156,14 @@ async function fetchLeagueData() {
                 <div class="error-message">
                     <h3>Unable to load League data</h3>
                     <p>Please check your internet connection and try again.</p>
+                    <button id="retry-league-btn" class="btn-primary">Retry</button>
                 </div>
             `;
+            // Add retry handler
+            const retryBtn = document.getElementById('retry-league-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => fetchLeagueData(true));
+            }
         }
     }
 }

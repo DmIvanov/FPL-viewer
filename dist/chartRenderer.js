@@ -24,10 +24,16 @@ export class ChartRenderer {
             console.error(`Canvas element not found: ${canvasId}`);
             return;
         }
-        // Destroy existing chart
+        // Destroy existing chart on this instance
         if (this.chart) {
             this.chart.destroy();
             this.chart = null;
+        }
+        // Destroy any chart that might exist on this canvas from Chart.js registry
+        const existingChart = Chart.getChart(canvasId);
+        if (existingChart) {
+            console.log(`🗑️ Destroying existing chart on canvas: ${canvasId}`);
+            existingChart.destroy();
         }
         // Reset selected managers
         this.selectedManagers.clear();
