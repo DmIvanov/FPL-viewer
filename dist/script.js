@@ -1,6 +1,11 @@
-"use strict";
-// ===== TYPE DEFINITIONS =====
-// ===== WEBSITE FUNCTIONALITY & INTERACTIVITY =====
+// ===== MAIN APPLICATION ENTRY POINT =====
+// Import API layer
+import { fetchRealFPLData } from './api.js';
+// Import UI layer
+import { setupMobileMenu, setupSmoothScrolling, setupIntersectionObserver, setupKeyboardAccessibility, setupResizeHandler, initializeFPLFeatures, initializeTabSwitching, setupTabSwitchingListeners, showLoadingState, populateCupTable } from './ui.js';
+// Import utilities
+import { debounce } from './utils.js';
+// ===== WEBSITE INITIALIZATION =====
 // Wait for the page to fully load before running TypeScript
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Website loaded successfully with TypeScript!');
@@ -11,90 +16,14 @@ function initializeWebsite() {
     setupMobileMenu();
     setupSmoothScrolling();
     setupIntersectionObserver();
+    setupKeyboardAccessibility();
+    setupResizeHandler(debounce);
     initializeFPLFeatures();
-    initializeTabSwitching();
+    initializeTabSwitching(fetchCupStandings);
+    setupTabSwitchingListeners(fetchCupStandings);
 }
-// ===== MOBILE NAVIGATION MENU =====
-function setupMobileMenu() {
-    const hamburger = document.querySelector('.hamburger');
-    const navMenu = document.querySelector('.nav-menu');
-    if (!hamburger || !navMenu)
-        return;
-    hamburger.addEventListener('click', () => {
-        hamburger.classList.toggle('active');
-        navMenu.classList.toggle('active');
-    });
-    // Close menu when clicking on a nav link
-    document.querySelectorAll('.nav-link').forEach((link) => {
-        link.addEventListener('click', () => {
-            hamburger.classList.remove('active');
-            navMenu.classList.remove('active');
-        });
-    });
-    // Close menu when clicking outside
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!hamburger.contains(target) && !navMenu.contains(target)) {
-            hamburger.classList.remove('active');
-            navMenu.classList.remove('active');
-        }
-    });
-}
-// ===== SMOOTH SCROLLING FOR NAVIGATION =====
-function setupSmoothScrolling() {
-    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-        anchor.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetId = anchor.getAttribute('href');
-            if (!targetId)
-                return;
-            const targetSection = document.querySelector(targetId);
-            if (targetSection) {
-                const header = document.querySelector('.header');
-                const headerHeight = header?.offsetHeight || 0;
-                const targetPosition = targetSection.offsetTop - headerHeight;
-                window.scrollTo({
-                    top: targetPosition,
-                    behavior: 'smooth'
-                });
-            }
-        });
-    });
-}
-// ===== SCROLL ANIMATIONS =====
-function setupIntersectionObserver() {
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('fade-in');
-            }
-        });
-    }, observerOptions);
-    // Observe elements for animation
-    document.querySelectorAll('.about-card, .contact-form, .progress-item')
-        .forEach((el) => {
-        observer.observe(el);
-    });
-}
-// ===== KEYBOARD ACCESSIBILITY =====
-document.addEventListener('keydown', (event) => {
-    // Close mobile menu with Escape key
-    if (event.key === 'Escape') {
-        const hamburger = document.querySelector('.hamburger');
-        const navMenu = document.querySelector('.nav-menu');
-        if (hamburger && navMenu) {
-            hamburger.classList.remove('active');
-            navMenu.classList.remove('active');
-        }
-    }
-});
 // ===== PERFORMANCE MONITORING =====
 window.addEventListener('load', () => {
-    // Log page load time for development
     const loadTime = performance.now();
     console.log(`⚡ TypeScript page loaded in ${Math.round(loadTime)}ms`);
 });
@@ -103,55 +32,26 @@ window.addEventListener('error', (event) => {
     console.error('❌ TypeScript Error:', event.error);
     // In a real project, you might want to report this to an error tracking service
 });
-// ===== UTILITY FUNCTIONS =====
-function debounce(func, wait) {
-    let timeout = null;
-    return function executedFunction(...args) {
-        const later = () => {
-            timeout = null;
-            func(...args);
-        };
-        if (timeout)
-            clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-// Add resize handler for responsive adjustments
-window.addEventListener('resize', debounce(() => {
-    // Close mobile menu on resize to desktop
-    if (window.innerWidth > 768) {
-        const hamburger = document.querySelector('.hamburger');
-        const navMenu = document.querySelector('.nav-menu');
-        if (hamburger && navMenu) {
-            hamburger.classList.remove('active');
-            navMenu.classList.remove('active');
-        }
-    }
-}, 250));
-// ===== FPL CUP FUNCTIONS =====
+// ===== DATA FETCHING & COORDINATION =====
+/**
+ * Fetches Cup standings and updates the UI
+ * Coordinates between the API layer and UI layer
+ */
 async function fetchCupStandings() {
     const tableBody = document.getElementById('cup-table-body');
     if (!tableBody) {
         console.log('❌ Cup table body not found');
         return;
     }
-    // Show loading state
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="6" style="text-align: center; padding: 2rem;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
-                    <span style="font-size: 1.5rem;">⏳</span>
-                    <span>Loading real FPL data...</span>
-                </div>
-            </td>
-        </tr>
-    `;
+    // Show loading state (UI layer)
+    showLoadingState();
     try {
         console.log('🚀 Fetching real FPL data from API...');
-        // Try to fetch real data from FPL API
+        // Fetch data from API (Network layer)
         const data = await fetchRealFPLData();
         if (data && data.standings && data.standings.results) {
             console.log(`✅ Successfully loaded ${data.standings.results.length} managers from live FPL API`);
+            // Update UI with fetched data
             populateCupTable(data.standings.results);
         }
         else {
@@ -170,188 +70,5 @@ async function fetchCupStandings() {
         console.log('✅ Cup standings loaded with mock data');
     }
 }
-async function fetchRealFPLData() {
-    const FPL_API_URL = 'https://fantasy.premierleague.com/api/leagues-classic/841567/standings/';
-    // Try multiple CORS proxy services for reliability
-    const CORS_PROXIES = [
-        'https://api.allorigins.win/get?url=',
-        'https://corsproxy.io/?',
-        'https://api.codetabs.com/v1/proxy?quest='
-    ];
-    console.log('🔍 Testing CORS proxies for FPL API access...');
-    for (let i = 0; i < CORS_PROXIES.length; i++) {
-        const proxyUrl = CORS_PROXIES[i];
-        if (!proxyUrl)
-            continue; // Skip if undefined
-        try {
-            console.log(`🔄 Attempting CORS proxy ${i + 1}/${CORS_PROXIES.length}: ${proxyUrl}`);
-            let fetchUrl;
-            let processResponse;
-            if (proxyUrl.includes('allorigins')) {
-                // AllOrigins returns data wrapped in a contents field
-                fetchUrl = `${proxyUrl}${encodeURIComponent(FPL_API_URL)}`;
-                processResponse = async (response) => {
-                    const data = await response.json();
-                    console.log('📦 AllOrigins raw response:', data);
-                    return JSON.parse(data.contents);
-                };
-            }
-            else {
-                // Other proxies return data directly
-                fetchUrl = `${proxyUrl}${FPL_API_URL}`;
-                processResponse = async (response) => {
-                    const data = await response.json();
-                    console.log('📦 Direct proxy response:', data);
-                    return data;
-                };
-            }
-            console.log('🌐 Fetching from:', fetchUrl);
-            const response = await fetch(fetchUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-            });
-            console.log(`📊 Response status: ${response.status} ${response.statusText}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await processResponse(response);
-            console.log('✅ Parsed FPL data:', data);
-            // Validate response structure
-            if (data && typeof data === 'object' && data.standings && Array.isArray(data.standings.results)) {
-                console.log(`📊 Found ${data.standings.results.length} managers in live data`);
-                console.log('🏆 Live data validation successful!');
-                return data;
-            }
-            else {
-                console.warn('⚠️ Invalid response structure from proxy:', data);
-                throw new Error('Invalid response structure');
-            }
-        }
-        catch (error) {
-            console.warn(`❌ CORS proxy ${i + 1} failed:`, error);
-            // If this was the last proxy, throw the error
-            if (i === CORS_PROXIES.length - 1) {
-                console.error('🚫 All CORS proxy attempts failed');
-                throw new Error('All CORS proxy attempts failed');
-            }
-            // Otherwise, continue to next proxy
-            console.log(`⏭️ Trying next proxy...`);
-        }
-    }
-    // This should never be reached, but TypeScript needs it
-    throw new Error('No proxy services available');
-}
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-function populateCupTable(managers) {
-    const tableBody = document.getElementById('cup-table-body');
-    if (!tableBody)
-        return;
-    const rows = managers.map((manager) => {
-        const rankChange = getRankChangeIndicator(manager.rank, manager.last_rank);
-        const rankClass = getRankClass(manager.rank);
-        return `
-            <tr class="cup-row ${rankClass}">
-                <td class="position">
-                    <span class="rank-number">${manager.rank}</span>
-                    ${rankChange}
-                </td>
-                <td class="manager-name">${escapeHtml(manager.player_name)}</td>
-                <td class="team-name">${escapeHtml(manager.entry_name)}</td>
-                <td class="total-points">${manager.total.toLocaleString()}</td>
-                <td class="gw-points">${manager.event_total}</td>
-                <td class="last-rank">${manager.last_rank}</td>
-            </tr>
-        `;
-    });
-    tableBody.innerHTML = rows.join('');
-    // Add hover effects
-    document.querySelectorAll('.cup-row').forEach((row) => {
-        row.addEventListener('mouseenter', () => {
-            row.style.transform = 'scale(1.02)';
-            row.style.transition = 'transform 0.2s ease';
-        });
-        row.addEventListener('mouseleave', () => {
-            row.style.transform = 'scale(1)';
-        });
-    });
-}
-function getRankChangeIndicator(currentRank, lastRank) {
-    if (currentRank < lastRank) {
-        return '<span class="rank-up">⬆️</span>';
-    }
-    else if (currentRank > lastRank) {
-        return '<span class="rank-down">⬇️</span>';
-    }
-    else {
-        return '<span class="rank-same">➡️</span>';
-    }
-}
-function getRankClass(rank) {
-    if (rank === 1)
-        return 'first-place';
-    if (rank <= 3)
-        return 'top-three';
-    if (rank <= 5)
-        return 'top-five';
-    return 'other-rank';
-}
-// ===== FPL SPECIFIC FUNCTIONS =====
-function initializeFPLFeatures() {
-    console.log('🏆 FPL features initialized successfully!');
-}
-function initializeTabSwitching() {
-    // Show Cup section by default, hide Charts section
-    const chartsSection = document.getElementById('charts');
-    const cupSection = document.getElementById('cup');
-    if (chartsSection)
-        chartsSection.style.display = 'none';
-    if (cupSection)
-        cupSection.style.display = 'block';
-    // Add active class to Cup tab
-    const cupLink = document.querySelector('a[href="#cup"]');
-    if (cupLink)
-        cupLink.classList.add('active');
-    // Auto-load Cup data on page load
-    console.log('🔄 Auto-loading Cup data on page load (with CORS proxy support)...');
-    fetchCupStandings();
-    console.log('🔧 Tab switching initialized - Cup section visible by default');
-}
-// Add tab switching functionality to nav links
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.nav-link').forEach((link) => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetId = link.getAttribute('href')?.substring(1) || ''; // Remove #
-            // Hide all sections
-            const chartsSection = document.getElementById('charts');
-            const cupSection = document.getElementById('cup');
-            if (chartsSection)
-                chartsSection.style.display = 'none';
-            if (cupSection)
-                cupSection.style.display = 'none';
-            // Show target section
-            const targetSection = document.getElementById(targetId);
-            if (targetSection)
-                targetSection.style.display = 'block';
-            // Update active nav link
-            document.querySelectorAll('.nav-link').forEach((l) => {
-                l.classList.remove('active');
-            });
-            link.classList.add('active');
-            // Auto-load Cup data when Cup tab is clicked
-            if (targetId === 'cup') {
-                console.log('Auto-loading Cup data...');
-                fetchCupStandings();
-            }
-            console.log('Switched to tab:', targetId);
-        });
-    });
-});
 console.log('⚽ FPL Analytics Dashboard loaded and ready!');
 //# sourceMappingURL=script.js.map
