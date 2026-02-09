@@ -1,6 +1,11 @@
 // ===== UI LAYER =====
 
-import type { FPLManager } from './types.js';
+import type { FPLManager, LeagueDataModel, H2HMatch, ChartType } from './types.js';
+import { ChartProcessor } from './chartProcessor.js';
+import { ChartRenderer } from './chartRenderer.js';
+
+// Declare Chart.js global
+declare const Chart: any;
 
 /**
  * Escapes HTML to prevent XSS attacks
@@ -190,44 +195,59 @@ export function initializeFPLFeatures(): void {
 /**
  * Initializes tab switching functionality
  */
-export function initializeTabSwitching(onCupTabClick: () => void): void {
-    // Show Cup section by default, hide Charts section
-    const chartsSection: HTMLElement | null = document.getElementById('charts');
-    const cupSection: HTMLElement | null = document.getElementById('cup');
+export function initializeTabSwitching(_onCupTabClick: () => void): void {
+    console.log('🔧 Initializing tab switching...');
     
-    if (chartsSection) chartsSection.style.display = 'none';
-    if (cupSection) cupSection.style.display = 'block';
+    // Add active class to League tab
+    const leagueLink: HTMLAnchorElement | null = document.querySelector('a[href="#league"]');
+    console.log('League link found:', leagueLink);
     
-    // Add active class to Cup tab
-    const cupLink: HTMLAnchorElement | null = document.querySelector('a[href="#cup"]');
-    if (cupLink) cupLink.classList.add('active');
+    if (leagueLink) {
+        leagueLink.classList.add('active');
+        console.log('✅ Added active class to League tab');
+    }
     
-    // Auto-load Cup data on page load
-    console.log('🔄 Auto-loading Cup data on page load (with CORS proxy support)...');
-    onCupTabClick();
+    // Verify sections exist
+    const leagueSection = document.getElementById('league');
+    const cupSection = document.getElementById('cup');
+    console.log('League section:', leagueSection, 'has active class:', leagueSection?.classList.contains('active'));
+    console.log('Cup section:', cupSection, 'has active class:', cupSection?.classList.contains('active'));
     
-    console.log('🔧 Tab switching initialized - Cup section visible by default');
+    console.log('🔧 Tab switching initialized - League section visible by default');
 }
 
 /**
  * Sets up tab switching event listeners
  */
-export function setupTabSwitchingListeners(onCupTabClick: () => void): void {
+export function setupTabSwitchingListeners(onCupTabClick: () => void, onLeagueTabClick?: () => void): void {
+    let leagueDataLoaded = false;
+    
+    const navLinks = document.querySelectorAll<HTMLAnchorElement>('.nav-link');
+    console.log(`🔗 Setting up tab switching for ${navLinks.length} nav links`);
+    
     document.querySelectorAll<HTMLAnchorElement>('.nav-link').forEach((link: HTMLAnchorElement): void => {
+        console.log('Adding listener to:', link.textContent, link.getAttribute('href'));
+        
         link.addEventListener('click', (e: MouseEvent): void => {
             e.preventDefault();
             const targetId: string = link.getAttribute('href')?.substring(1) || '';
             
-            // Hide all sections
-            const chartsSection: HTMLElement | null = document.getElementById('charts');
-            const cupSection: HTMLElement | null = document.getElementById('cup');
+            console.log(`🖱️ Tab clicked: ${targetId}`);
             
-            if (chartsSection) chartsSection.style.display = 'none';
-            if (cupSection) cupSection.style.display = 'none';
+            // Hide all tab sections
+            document.querySelectorAll('.tab-section').forEach((section: Element) => {
+                section.classList.remove('active');
+                console.log('Removed active from:', section.id);
+            });
             
             // Show target section
             const targetSection: HTMLElement | null = document.getElementById(targetId);
-            if (targetSection) targetSection.style.display = 'block';
+            if (targetSection) {
+                targetSection.classList.add('active');
+                console.log('✅ Added active to:', targetId);
+            } else {
+                console.error('❌ Target section not found:', targetId);
+            }
             
             // Update active nav link
             document.querySelectorAll<HTMLAnchorElement>('.nav-link').forEach((l: HTMLAnchorElement): void => {
@@ -239,6 +259,13 @@ export function setupTabSwitchingListeners(onCupTabClick: () => void): void {
             if (targetId === 'cup') {
                 console.log('Auto-loading Cup data...');
                 onCupTabClick();
+            }
+            
+            // Auto-load League data when League tab is clicked (only once)
+            if (targetId === 'league' && onLeagueTabClick && !leagueDataLoaded) {
+                console.log('Auto-loading League data...');
+                onLeagueTabClick();
+                leagueDataLoaded = true;
             }
             
             console.log('Switched to tab:', targetId);
@@ -278,4 +305,355 @@ export function setupResizeHandler(debounce: <T extends (...args: any[]) => any>
             }
         }
     }, 250));
+}
+
+// ===== LEAGUE UI FUNCTIONS =====
+
+/**
+ * Shows loading state in the League section
+ */
+export function showLeagueLoadingState(): void {
+    const loadingIndicator: HTMLElement | null = document.getElementById('league-loading');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'flex';
+    }
+}
+
+/**
+ * Hides loading state in the League section
+ */
+export function hideLeagueLoadingState(): void {
+    const loadingIndicator: HTMLElement | null = document.getElementById('league-loading');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
+
+/**
+ * Sets up League subtab switching
+ */
+export function setupLeagueSubtabs(leagueData: LeagueDataModel | null): void {
+    const subtabButtons = document.querySelectorAll<HTMLButtonElement>('.subtab-btn');
+    const leaguePages = document.querySelectorAll<HTMLElement>('.league-page');
+    
+    // Populate initial active page
+    const activeButton = document.querySelector<HTMLButtonElement>('.subtab-btn.active');
+    if (activeButton && leagueData) {
+        const initialPage = activeButton.getAttribute('data-page');
+        if (initialPage) {
+            populateLeaguePage(initialPage, leagueData);
+        }
+    }
+    
+    subtabButtons.forEach((button: HTMLButtonElement): void => {
+        button.addEventListener('click', (): void => {
+            const targetPage = button.getAttribute('data-page');
+            
+            // Update active button
+            subtabButtons.forEach((btn: HTMLButtonElement): void => {
+                btn.classList.remove('active');
+            });
+            button.classList.add('active');
+            
+            // Show corresponding page
+            leaguePages.forEach((page: HTMLElement): void => {
+                page.classList.remove('active');
+            });
+            
+            const targetPageElement = document.getElementById(`league-${targetPage}`);
+            if (targetPageElement) {
+                targetPageElement.classList.add('active');
+                
+                // Populate page content if data is available
+                if (leagueData) {
+                    populateLeaguePage(targetPage, leagueData);
+                }
+            }
+            
+            console.log(`📄 Switched to League subtab: ${targetPage}`);
+        });
+    });
+}
+
+/**
+ * Populates content for a specific League page
+ */
+function populateLeaguePage(pageName: string | null, data: LeagueDataModel): void {
+    if (!pageName) return;
+    
+    console.log(`📄 Populating page: ${pageName}`);
+    
+    const contentElement = document.getElementById(`${pageName}-content`);
+    if (!contentElement) {
+        console.error(`❌ Content element not found: ${pageName}-content`);
+        return;
+    }
+    
+    switch (pageName) {
+        case 'overview':
+            populateOverviewPage(contentElement, data);
+            break;
+        case 'standings':
+            populateStandingsPage(contentElement, data);
+            break;
+        case 'matches':
+            populateMatchesPage(contentElement, data);
+            break;
+        case 'statistics':
+            populateStatisticsPage(contentElement, data);
+            break;
+        case 'history':
+            populateHistoryPage(contentElement, data);
+            break;
+        default:
+            console.warn(`⚠️ Unknown page: ${pageName}`);
+    }
+}
+
+/**
+ * Populates Overview page
+ */
+function populateOverviewPage(element: HTMLElement, data: LeagueDataModel): void {
+    element.innerHTML = `
+        <div class="overview-stats">
+            <div class="stat-card">
+                <h4>Total Matches</h4>
+                <p class="stat-value">${data.totalMatches}</p>
+            </div>
+            <div class="stat-card">
+                <h4>Last Updated</h4>
+                <p class="stat-value">${data.lastUpdated.toLocaleString()}</p>
+            </div>
+            <div class="stat-card">
+                <h4>League Type</h4>
+                <p class="stat-value">Head-to-Head</p>
+            </div>
+        </div>
+        <div class="overview-info">
+            <p>📊 League data successfully loaded with ${data.matches.length} matches.</p>
+        </div>
+    `;
+}
+
+/**
+ * Populates Standings page
+ */
+function populateStandingsPage(element: HTMLElement, data: LeagueDataModel): void {
+    element.innerHTML = `
+        <div class="standings-container">
+            <p>🏆 Standings will be calculated from match results.</p>
+            <p>Total matches available: ${data.totalMatches}</p>
+        </div>
+    `;
+}
+
+/**
+ * Populates Matches page
+ */
+function populateMatchesPage(element: HTMLElement, data: LeagueDataModel): void {
+    const matchesByGameweek = groupMatchesByGameweek(data.matches);
+    
+    let html = '<div class="matches-list">';
+    
+    Object.keys(matchesByGameweek).sort((a, b) => parseInt(b) - parseInt(a)).forEach(gwStr => {
+        const gw = parseInt(gwStr);
+        const matches = matchesByGameweek[gw];
+        
+        if (!matches) return;
+        
+        html += `
+            <div class="gameweek-section">
+                <h4>Gameweek ${gw}</h4>
+                <div class="matches-grid">
+        `;
+        
+        matches.forEach((match: H2HMatch) => {
+            const winner = match.entry_1_points > match.entry_2_points ? 1 : 
+                          match.entry_2_points > match.entry_1_points ? 2 : 0;
+            
+            html += `
+                <div class="match-card">
+                    <div class="match-entry ${winner === 1 ? 'winner' : ''}">
+                        <span class="team-name">${escapeHtml(match.entry_1_name)}</span>
+                        <span class="points">${match.entry_1_points}</span>
+                    </div>
+                    <div class="match-vs">vs</div>
+                    <div class="match-entry ${winner === 2 ? 'winner' : ''}">
+                        <span class="team-name">${escapeHtml(match.entry_2_name)}</span>
+                        <span class="points">${match.entry_2_points}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    element.innerHTML = html;
+}
+
+/**
+ * Populates Statistics page
+ */
+/**
+ * Populates Statistics page with charts
+ */
+function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): void {
+    console.log('📊 Populating Statistics page...');
+    
+    // Create chart HTML structure
+    element.innerHTML = `
+        <div class="statistics-container">
+            <div class="chart-type-selector">
+                <button class="chart-type-btn active" data-chart-type="absolute">Absolute</button>
+                <button class="chart-type-btn" data-chart-type="relative">Relative</button>
+            </div>
+            
+            <div class="chart-section" id="absolute-chart-section">
+                <div class="chart-canvas-wrapper">
+                    <canvas id="absolute-chart"></canvas>
+                </div>
+                <div id="absolute-legend" class="chart-legend"></div>
+            </div>
+            
+            <div class="chart-section hidden" id="relative-chart-section">
+                <div class="chart-canvas-wrapper">
+                    <canvas id="relative-chart"></canvas>
+                </div>
+                <div id="relative-legend" class="chart-legend"></div>
+            </div>
+        </div>
+    `;
+    
+    // Wait for DOM to be ready, then render charts
+    setTimeout(() => {
+        try {
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('❌ Chart.js library not loaded');
+                element.innerHTML = `
+                    <div class="error-message">
+                        <h3>Chart library not loaded</h3>
+                        <p>Please refresh the page to load the chart library.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            console.log('✅ Chart.js loaded, processing data...');
+            
+            // Process data to get chart models
+            const processor = new ChartProcessor(data.matches);
+            const chartData = processor.process();
+            
+            console.log(`📈 Processed ${chartData.absoluteManagers.length} managers for charts`);
+            
+            // Create chart renderers
+            const absoluteRenderer = new ChartRenderer();
+            const relativeRenderer = new ChartRenderer();
+            
+            // Render absolute chart (default view)
+            console.log('🎨 Rendering absolute chart...');
+            absoluteRenderer.renderChart(
+                'absolute-chart',
+                chartData.absoluteManagers,
+                'absolute',
+                'absolute-legend'
+            );
+            
+            // Setup chart type switching
+            const chartTypeButtons = element.querySelectorAll('.chart-type-btn');
+            chartTypeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const chartType = button.getAttribute('data-chart-type') as ChartType;
+                    
+                    // Update active button
+                    chartTypeButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Show/hide chart sections
+                    const absoluteSection = document.getElementById('absolute-chart-section');
+                    const relativeSection = document.getElementById('relative-chart-section');
+                    
+                    if (chartType === 'absolute') {
+                        absoluteSection?.classList.remove('hidden');
+                        relativeSection?.classList.add('hidden');
+                        
+                        // Render absolute chart if not already rendered
+                        if (!absoluteSection?.hasAttribute('data-rendered')) {
+                            absoluteRenderer.renderChart(
+                                'absolute-chart',
+                                chartData.absoluteManagers,
+                                'absolute',
+                                'absolute-legend'
+                            );
+                            absoluteSection?.setAttribute('data-rendered', 'true');
+                        }
+                    } else {
+                        absoluteSection?.classList.add('hidden');
+                        relativeSection?.classList.remove('hidden');
+                        
+                        // Render relative chart on first view
+                        if (!relativeSection?.hasAttribute('data-rendered')) {
+                            console.log('🎨 Rendering relative chart...');
+                            relativeRenderer.renderChart(
+                                'relative-chart',
+                                chartData.relativeManagers,
+                                'relative',
+                                'relative-legend'
+                            );
+                            relativeSection?.setAttribute('data-rendered', 'true');
+                        }
+                    }
+                });
+            });
+            
+            // Mark absolute chart as rendered
+            const absoluteSection = document.getElementById('absolute-chart-section');
+            absoluteSection?.setAttribute('data-rendered', 'true');
+            
+            console.log('✅ Statistics page populated successfully');
+        } catch (error) {
+            console.error('❌ Error rendering charts:', error);
+            element.innerHTML = `
+                <div class="error-message">
+                    <h3>Error loading charts</h3>
+                    <p>An error occurred while rendering the charts. Please try again.</p>
+                    <p style="font-size: 0.85em; color: var(--text-secondary);">${error}</p>
+                </div>
+            `;
+        }
+    }, 100);
+}
+
+/**
+ * Populates History page
+ */
+function populateHistoryPage(element: HTMLElement, _data: LeagueDataModel): void {
+    element.innerHTML = `
+        <div class="history-container">
+            <p>📜 Historical trends and patterns will be shown here.</p>
+        </div>
+    `;
+}
+
+/**
+ * Helper function to group matches by gameweek
+ */
+function groupMatchesByGameweek(matches: H2HMatch[]): Record<number, H2HMatch[]> {
+    const grouped: Record<number, H2HMatch[]> = {};
+    
+    matches.forEach(match => {
+        const eventNum = match.event;
+        if (!grouped[eventNum]) {
+            grouped[eventNum] = [];
+        }
+        grouped[eventNum]!.push(match);
+    });
+    
+    return grouped;
 }

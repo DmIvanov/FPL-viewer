@@ -4,7 +4,7 @@
 import type { FPLManager } from './types.js';
 
 // Import API layer
-import { fetchRealFPLData } from './api.js';
+import { fetchRealFPLData, fetchH2HMatches } from './api.js';
 
 // Import UI layer
 import {
@@ -17,7 +17,10 @@ import {
     initializeTabSwitching,
     setupTabSwitchingListeners,
     showLoadingState,
-    populateCupTable
+    populateCupTable,
+    showLeagueLoadingState,
+    hideLeagueLoadingState,
+    setupLeagueSubtabs
 } from './ui.js';
 
 // Import utilities
@@ -40,7 +43,11 @@ function initializeWebsite(): void {
     setupResizeHandler(debounce);
     initializeFPLFeatures();
     initializeTabSwitching(fetchCupStandings);
-    setupTabSwitchingListeners(fetchCupStandings);
+    setupTabSwitchingListeners(fetchCupStandings, fetchLeagueData);
+    
+    // Auto-load League data on page load
+    console.log('🔄 Auto-loading League data on page load...');
+    fetchLeagueData();
 }
 
 // ===== PERFORMANCE MONITORING =====
@@ -98,6 +105,45 @@ async function fetchCupStandings(): Promise<void> {
         
         populateCupTable(mockManagers);
         console.log('✅ Cup standings loaded with mock data');
+    }
+}
+
+/**
+ * Fetches League H2H data and updates the UI
+ * Coordinates between the API layer and UI layer for the League tab
+ */
+async function fetchLeagueData(): Promise<void> {
+    console.log('🏆 Fetching League H2H data...');
+    
+    // Show loading state (UI layer)
+    showLeagueLoadingState();
+    
+    try {
+        // Fetch H2H matches from API with pagination (Network layer)
+        const leagueData = await fetchH2HMatches();
+        
+        console.log(`✅ Successfully loaded ${leagueData.matches.length} H2H matches`);
+        
+        // Setup League subtabs and populate with data (UI layer)
+        setupLeagueSubtabs(leagueData);
+        
+        // Hide loading state
+        hideLeagueLoadingState();
+        
+    } catch (error) {
+        console.error('❌ Failed to load League data:', error);
+        hideLeagueLoadingState();
+        
+        // Show error message to user
+        const overviewContent = document.getElementById('overview-content');
+        if (overviewContent) {
+            overviewContent.innerHTML = `
+                <div class="error-message">
+                    <h3>Unable to load League data</h3>
+                    <p>Please check your internet connection and try again.</p>
+                </div>
+            `;
+        }
     }
 }
 
