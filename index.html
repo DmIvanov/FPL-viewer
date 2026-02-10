@@ -40,32 +40,22 @@
                 
                 <!-- Subtabs Navigation -->
                 <div class="league-subtabs">
-                    <button class="subtab-btn active" data-page="overview">Overview</button>
-                    <button class="subtab-btn" data-page="standings">Standings</button>
+                    <button class="subtab-btn active" data-page="standings">Standings</button>
                     <button class="subtab-btn" data-page="matches">Matches</button>
-                    <button class="subtab-btn" data-page="statistics">Statistics</button>
+                    <button class="subtab-btn" data-page="statistics">Charts</button>
                     <button class="subtab-btn" data-page="history">History</button>
                     <button id="refresh-league-btn" class="btn-secondary" title="Refresh league data">🔄</button>
                 </div>
                 
                 <!-- League Pages -->
                 <div class="league-pages">
-                    <!-- Overview Page -->
-                    <div id="league-overview" class="league-page active">
-                        <h3>League Overview</h3>
-                        <div class="loading-indicator" id="league-loading">
-                            <span>⏳ Loading league data...</span>
-                        </div>
-                        <div id="overview-content" class="page-content">
-                            <!-- Overview content will be populated here -->
-                        </div>
-                    </div>
-                    
                     <!-- Standings Page -->
-                    <div id="league-standings" class="league-page">
+                    <div id="league-standings" class="league-page active">
                         <h3>League Standings</h3>
                         <div id="standings-content" class="page-content">
-                            <!-- Standings content will be populated here -->
+                            <div class="loading-indicator active" id="league-loading">
+                                <span>⏳ Loading league data...</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -77,11 +67,11 @@
                         </div>
                     </div>
                     
-                    <!-- Statistics Page -->
+                    <!-- Charts Page -->
                     <div id="league-statistics" class="league-page">
-                        <h3>League Statistics</h3>
+                        <h3>League Charts</h3>
                         <div id="statistics-content" class="page-content">
-                            <!-- Statistics content will be populated here -->
+                            <!-- Chart content will be populated here -->
                         </div>
                     </div>
                     

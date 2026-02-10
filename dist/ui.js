@@ -335,9 +335,6 @@ function populateLeaguePage(pageName, data) {
         return;
     }
     switch (pageName) {
-        case 'overview':
-            populateOverviewPage(contentElement, data);
-            break;
         case 'standings':
             populateStandingsPage(contentElement, data);
             break;
@@ -355,95 +352,255 @@ function populateLeaguePage(pageName, data) {
     }
 }
 /**
- * Populates Overview page
- */
-function populateOverviewPage(element, data) {
-    element.innerHTML = `
-        <div class="overview-stats">
-            <div class="stat-card">
-                <h4>Total Matches</h4>
-                <p class="stat-value">${data.totalMatches}</p>
-            </div>
-            <div class="stat-card">
-                <h4>Last Updated</h4>
-                <p class="stat-value">${data.lastUpdated.toLocaleString()}</p>
-            </div>
-            <div class="stat-card">
-                <h4>League Type</h4>
-                <p class="stat-value">Head-to-Head</p>
-            </div>
-        </div>
-        <div class="overview-info">
-            <p>📊 League data successfully loaded with ${data.matches.length} matches.</p>
-        </div>
-    `;
-}
-/**
  * Populates Standings page
  */
 function populateStandingsPage(element, data) {
-    element.innerHTML = `
+    // Calculate standings from matches
+    const standings = calculateLeagueStandings(data.matches);
+    let html = `
         <div class="standings-container">
-            <p>🏆 Standings will be calculated from match results.</p>
-            <p>Total matches available: ${data.totalMatches}</p>
+            <div class="league-table-wrapper">
+                <table class="league-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Manager</th>
+                            <th>Team</th>
+                            <th>Points</th>
+                            <th>Total Pts</th>
+                            <th>W</th>
+                            <th>D</th>
+                            <th>L</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    standings.forEach((manager, index) => {
+        html += `
+            <tr>
+                <td class="rank">${index + 1}</td>
+                <td class="manager-name">${escapeHtml(manager.playerName)}</td>
+                <td class="team-name">${escapeHtml(manager.teamName)}</td>
+                <td class="league-points"><strong>${manager.leaguePoints}</strong></td>
+                <td class="total-points">${manager.totalPoints}</td>
+                <td class="wins">${manager.wins}</td>
+                <td class="draws">${manager.draws}</td>
+                <td class="losses">${manager.losses}</td>
+            </tr>
+        `;
+    });
+    html += `
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
+    element.innerHTML = html;
+}
+function calculateLeagueStandings(matches) {
+    const managersMap = new Map();
+    // Process each match
+    matches.forEach(match => {
+        // Process entry 1
+        if (!managersMap.has(match.entry_1_name)) {
+            managersMap.set(match.entry_1_name, {
+                playerName: match.entry_1_player_name,
+                teamName: match.entry_1_name,
+                leaguePoints: 0,
+                totalPoints: 0,
+                wins: 0,
+                draws: 0,
+                losses: 0
+            });
+        }
+        // Process entry 2
+        if (!managersMap.has(match.entry_2_name)) {
+            managersMap.set(match.entry_2_name, {
+                playerName: match.entry_2_player_name,
+                teamName: match.entry_2_name,
+                leaguePoints: 0,
+                totalPoints: 0,
+                wins: 0,
+                draws: 0,
+                losses: 0
+            });
+        }
+        const manager1 = managersMap.get(match.entry_1_name);
+        const manager2 = managersMap.get(match.entry_2_name);
+        // Add total points
+        manager1.totalPoints += match.entry_1_points;
+        manager2.totalPoints += match.entry_2_points;
+        // Determine match result and update stats
+        if (match.entry_1_points > match.entry_2_points) {
+            // Entry 1 wins
+            manager1.wins++;
+            manager1.leaguePoints += 3;
+            manager2.losses++;
+        }
+        else if (match.entry_2_points > match.entry_1_points) {
+            // Entry 2 wins
+            manager2.wins++;
+            manager2.leaguePoints += 3;
+            manager1.losses++;
+        }
+        else if (match.entry_1_points > 0 && match.entry_2_points > 0) {
+            // Draw (only if both have played - non-zero points)
+            manager1.draws++;
+            manager1.leaguePoints += 1;
+            manager2.draws++;
+            manager2.leaguePoints += 1;
+        }
+    });
+    // Convert to array and sort by league points (descending), then by total points
+    const standings = Array.from(managersMap.values()).sort((a, b) => {
+        if (b.leaguePoints !== a.leaguePoints) {
+            return b.leaguePoints - a.leaguePoints;
+        }
+        return b.totalPoints - a.totalPoints;
+    });
+    return standings;
 }
 /**
  * Populates Matches page
  */
 function populateMatchesPage(element, data) {
-    const matchesByGameweek = groupMatchesByGameweek(data.matches);
-    let html = '<div class="matches-list">';
-    Object.keys(matchesByGameweek).sort((a, b) => parseInt(b) - parseInt(a)).forEach(gwStr => {
-        const gw = parseInt(gwStr);
-        const matches = matchesByGameweek[gw];
-        if (!matches)
-            return;
-        html += `
-            <div class="gameweek-section">
-                <h4>Gameweek ${gw}</h4>
-                <div class="matches-grid">
-        `;
-        matches.forEach((match) => {
-            const winner = match.entry_1_points > match.entry_2_points ? 1 :
-                match.entry_2_points > match.entry_1_points ? 2 : 0;
+    // Get unique managers
+    const managersSet = new Set();
+    data.matches.forEach(match => {
+        managersSet.add(match.entry_1_name);
+        managersSet.add(match.entry_2_name);
+    });
+    const managers = Array.from(managersSet).sort();
+    // Get all gameweeks sorted descending
+    const gameweeks = Array.from(new Set(data.matches.map(m => m.event))).sort((a, b) => b - a);
+    // Find last gameweek with played matches (both teams have non-zero points)
+    const currentGameweek = data.matches
+        .filter(m => m.entry_1_points > 0 && m.entry_2_points > 0)
+        .reduce((max, match) => Math.max(max, match.event), 0);
+    // If no played matches found, use the latest gameweek
+    const defaultGameweek = currentGameweek > 0 ? currentGameweek : (gameweeks[0] || 1);
+    // Create filter UI
+    let html = `
+        <div class="matches-filters">
+            <div class="filter-group">
+                <label for="gameweek-filter">Filter by Gameweek:</label>
+                <select id="gameweek-filter" class="filter-select">
+                    <option value="all">All Gameweeks</option>
+                    ${gameweeks.map(gw => {
+        const isCurrent = gw === currentGameweek && currentGameweek > 0;
+        const label = `Gameweek ${gw}${isCurrent ? ' (current)' : ''}`;
+        return `<option value="${gw}" ${gw === defaultGameweek ? 'selected' : ''}>${label}</option>`;
+    }).join('')}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="manager-filter">Filter by Manager:</label>
+                <select id="manager-filter" class="filter-select">
+                    <option value="all">All Managers</option>
+                    ${managers.map(manager => `<option value="${escapeHtml(manager)}">${escapeHtml(manager)}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+        <div id="matches-display" class="matches-list"></div>
+    `;
+    element.innerHTML = html;
+    // Render matches with default filter (default gameweek)
+    renderFilteredMatches(data.matches, String(defaultGameweek), 'all');
+    // Setup filter event listeners
+    const gameweekFilter = document.getElementById('gameweek-filter');
+    const managerFilter = document.getElementById('manager-filter');
+    if (gameweekFilter && managerFilter) {
+        gameweekFilter.addEventListener('change', () => {
+            // Reset manager filter when gameweek changes
+            if (gameweekFilter.value !== 'all') {
+                managerFilter.value = 'all';
+            }
+            renderFilteredMatches(data.matches, gameweekFilter.value, managerFilter.value);
+        });
+        managerFilter.addEventListener('change', () => {
+            // Reset gameweek filter when manager changes
+            if (managerFilter.value !== 'all') {
+                gameweekFilter.value = 'all';
+            }
+            renderFilteredMatches(data.matches, gameweekFilter.value, managerFilter.value);
+        });
+    }
+}
+/**
+ * Renders matches based on filter criteria
+ */
+function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
+    const displayElement = document.getElementById('matches-display');
+    if (!displayElement)
+        return;
+    // Filter matches based on criteria
+    let filteredMatches = matches;
+    if (gameweekFilter !== 'all') {
+        const gw = parseInt(gameweekFilter);
+        filteredMatches = filteredMatches.filter(m => m.event === gw);
+    }
+    if (managerFilter !== 'all') {
+        filteredMatches = filteredMatches.filter(m => m.entry_1_name === managerFilter || m.entry_2_name === managerFilter);
+    }
+    // Group by gameweek if showing multiple gameweeks
+    const matchesByGameweek = groupMatchesByGameweek(filteredMatches);
+    let html = '';
+    if (filteredMatches.length === 0) {
+        html = '<div class="no-matches"><p>No matches found for selected filters.</p></div>';
+    }
+    else {
+        Object.keys(matchesByGameweek).sort((a, b) => parseInt(a) - parseInt(b)).forEach(gwStr => {
+            const gw = parseInt(gwStr);
+            const gwMatches = matchesByGameweek[gw];
+            if (!gwMatches)
+                return;
             html += `
-                <div class="match-card">
-                    <div class="match-entry ${winner === 1 ? 'winner' : ''}">
-                        <span class="team-name">${escapeHtml(match.entry_1_name)}</span>
-                        <span class="points">${match.entry_1_points}</span>
+                <div class="gameweek-section">
+                    <h4>Gameweek ${gw}</h4>
+                    <div class="matches-grid">
+            `;
+            gwMatches.forEach((match) => {
+                const winner = match.entry_1_points > match.entry_2_points ? 1 :
+                    match.entry_2_points > match.entry_1_points ? 2 : 0;
+                // Highlight the filtered manager if applicable
+                const isEntry1Highlighted = managerFilter !== 'all' && match.entry_1_name === managerFilter;
+                const isEntry2Highlighted = managerFilter !== 'all' && match.entry_2_name === managerFilter;
+                html += `
+                    <div class="match-card">
+                        <div class="match-entry ${winner === 1 ? 'winner' : ''} ${isEntry1Highlighted ? 'highlighted' : ''}">
+                            <span class="team-name">${escapeHtml(match.entry_1_name)}</span>
+                            <span class="points">${match.entry_1_points}</span>
+                        </div>
+                        <div class="match-vs">vs</div>
+                        <div class="match-entry ${winner === 2 ? 'winner' : ''} ${isEntry2Highlighted ? 'highlighted' : ''}">
+                            <span class="team-name">${escapeHtml(match.entry_2_name)}</span>
+                            <span class="points">${match.entry_2_points}</span>
+                        </div>
                     </div>
-                    <div class="match-vs">vs</div>
-                    <div class="match-entry ${winner === 2 ? 'winner' : ''}">
-                        <span class="team-name">${escapeHtml(match.entry_2_name)}</span>
-                        <span class="points">${match.entry_2_points}</span>
+                `;
+            });
+            html += `
                     </div>
                 </div>
             `;
         });
-        html += `
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-    element.innerHTML = html;
+    }
+    displayElement.innerHTML = html;
 }
 /**
- * Populates Statistics page
+ * Populates Charts page
  */
 /**
- * Populates Statistics page with charts
+ * Populates Charts page with charts
  */
 // Global chart renderer instances to manage lifecycle
 let absoluteChartRenderer = null;
 let relativeChartRenderer = null;
 function populateStatisticsPage(element, data) {
-    console.log('📊 Populating Statistics page...');
+    console.log('📊 Populating Charts page...');
     // Check if already populated to avoid re-rendering
     if (element.hasAttribute('data-charts-initialized')) {
-        console.log('✅ Statistics page already initialized, skipping re-render');
+        console.log('✅ Charts page already initialized, skipping re-render');
         return;
     }
     // Destroy any existing chart instances before recreating HTML
@@ -540,7 +697,7 @@ function populateStatisticsPage(element, data) {
             absoluteSection?.setAttribute('data-rendered', 'true');
             // Mark the statistics page as initialized
             element.setAttribute('data-charts-initialized', 'true');
-            console.log('✅ Statistics page populated successfully');
+            console.log('✅ Charts page populated successfully');
         }
         catch (error) {
             console.error('❌ Error rendering charts:', error);

@@ -106,37 +106,13 @@ async function fetchLeagueData(forceRefresh = false) {
     try {
         // Fetch H2H matches with progressive updates
         const leagueData = await fetchH2HMatches((matches, isComplete) => {
-            // Update UI progressively as data arrives
-            const progressData = {
-                matches,
-                totalMatches: matches.length,
-                lastUpdated: new Date()
-            };
-            // Update overview with current progress
-            const overviewContent = document.getElementById('overview-content');
-            if (overviewContent) {
-                overviewContent.innerHTML = `
-                    <div class="overview-stats">
-                        <div class="stat-card">
-                            <h4>Total Matches</h4>
-                            <p class="stat-value">${matches.length}${!isComplete ? '...' : ''}</p>
-                        </div>
-                        <div class="stat-card">
-                            <h4>Status</h4>
-                            <p class="stat-value">${isComplete ? '✅ Complete' : '⏳ Loading...'}</p>
-                        </div>
-                        <div class="stat-card">
-                            <h4>League Type</h4>
-                            <p class="stat-value">Head-to-Head</p>
-                        </div>
-                    </div>
-                    <div class="overview-info">
-                        <p>📊 ${isComplete ? `League data loaded with ${matches.length} matches.` : `Loading matches: ${matches.length}...`}</p>
-                    </div>
-                `;
-            }
             // If complete, populate all tabs
             if (isComplete) {
+                const progressData = {
+                    matches,
+                    totalMatches: matches.length,
+                    lastUpdated: new Date()
+                };
                 setupLeagueSubtabs(progressData);
             }
         });
@@ -149,10 +125,10 @@ async function fetchLeagueData(forceRefresh = false) {
     catch (error) {
         console.error('❌ Failed to load League data:', error);
         hideLeagueLoadingState();
-        // Show error message to user
-        const overviewContent = document.getElementById('overview-content');
-        if (overviewContent) {
-            overviewContent.innerHTML = `
+        // Show error message to user in standings content
+        const standingsContent = document.getElementById('standings-content');
+        if (standingsContent) {
+            standingsContent.innerHTML = `
                 <div class="error-message">
                     <h3>Unable to load League data</h3>
                     <p>Please check your internet connection and try again.</p>
