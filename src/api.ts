@@ -16,13 +16,37 @@ const CORS_PROXIES = [
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 let cachedLeagueData: { data: LeagueDataModel; timestamp: number } | null = null;
 let workingProxyIndex: number = 0; // Remember which proxy works
+let directAccessWorks: boolean | null = null; // Track if direct access works (null = not tested yet)
 
 /**
  * Fetches real FPL data from the Fantasy Premier League API
  * Uses multiple CORS proxy services for reliability
  */
 export async function fetchRealFPLData(): Promise<FPLLeagueStandings> {
-    console.log('🔍 Testing CORS proxies for FPL API access...');
+    // Try direct access first if we haven't confirmed it doesn't work
+    if (directAccessWorks !== false) {
+        try {
+            console.log('🚀 Attempting direct API access (no proxy)...');
+            const response = await fetch(FPL_API_URL, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data && typeof data === 'object' && data.standings && Array.isArray(data.standings.results)) {
+                    console.log('✅ Direct API access successful! No proxy needed.');
+                    directAccessWorks = true;
+                    return data as FPLLeagueStandings;
+                }
+            }
+        } catch (error) {
+            console.log('⚠️ Direct API access blocked by CORS, falling back to proxies...');
+            directAccessWorks = false;
+        }
+    }
+    
+    console.log('🔍 Using CORS proxies for FPL API access...');
     
     for (let i = 0; i < CORS_PROXIES.length; i++) {
         const proxyUrl = CORS_PROXIES[i];
@@ -103,6 +127,33 @@ export async function fetchRealFPLData(): Promise<FPLLeagueStandings> {
  */
 async function fetchH2HPage(pageNumber: number): Promise<H2HMatchesResponse> {
     const pageUrl = `${H2H_API_BASE_URL}?page=${pageNumber}`;
+    
+    // Try direct access first if we know it works or haven't tested it yet
+    if (directAccessWorks !== false) {
+        try {
+            const response = await fetch(pageUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data && typeof data === 'object' && Array.isArray(data.results)) {
+                    if (directAccessWorks === null) {
+                        console.log('✅ Direct API access works! Using direct calls for faster loading.');
+                        directAccessWorks = true;
+                    }
+                    return data as H2HMatchesResponse;
+                }
+            }
+        } catch (error) {
+            // CORS blocked, fall through to proxy method
+            if (directAccessWorks === null) {
+                console.log('⚠️ Direct API access blocked, using proxies...');
+                directAccessWorks = false;
+            }
+        }
+    }
     
     // Try working proxy first, then others
     const proxyOrder = [
@@ -269,5 +320,6 @@ export async function fetchH2HMatches(
  */
 export function clearLeagueCache(): void {
     cachedLeagueData = null;
+    directAccessWorks = null; // Re-test direct access on next request
     console.log('🗑️ League cache cleared');
 }
