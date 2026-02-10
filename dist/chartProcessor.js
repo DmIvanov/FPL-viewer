@@ -64,6 +64,8 @@ export class ChartProcessor {
             let man1res;
             let man2res;
             let happened;
+            // Use the finished flag from API and check if both have points
+            const hasFinished = match.finished && (match.entry_1_points > 0 || match.entry_2_points > 0);
             if (entry1Win === 1) {
                 winnerId = manager1.id;
                 man1res = 3;
@@ -83,6 +85,29 @@ export class ChartProcessor {
                 man1res = 1;
                 man2res = 1;
                 draw = true;
+                happened = true;
+            }
+            else if (hasFinished) {
+                // Match is finished but win/draw flags might not be set
+                // Determine winner based on points
+                if (match.entry_1_points > match.entry_2_points) {
+                    winnerId = manager1.id;
+                    man1res = 3;
+                    man2res = 0;
+                    draw = false;
+                }
+                else if (match.entry_2_points > match.entry_1_points) {
+                    winnerId = manager2.id;
+                    man1res = 0;
+                    man2res = 3;
+                    draw = false;
+                }
+                else {
+                    winnerId = null;
+                    man1res = 1;
+                    man2res = 1;
+                    draw = true;
+                }
                 happened = true;
             }
             else {
@@ -114,59 +139,102 @@ export class ChartProcessor {
     process() {
         // Filter only matches that have happened
         const happenedMatches = this.matches.filter(m => m.happened);
-        // Track match points per week (3 for win, 1 for draw, 0 for loss)
-        const matchPointsWeekly = new Map();
-        // Track cumulative absolute FPL points per week
-        const absolutePointsWeekly = new Map();
-        // Process each match
+        // Sort matches by gameweek
+        happenedMatches.sort((a, b) => a.gameWeek - b.gameWeek);
+        // Collect all managers and find min/max gameweeks
+        let minGameWeek = Infinity;
+        let maxGameWeek = -Infinity;
         for (const match of happenedMatches) {
-            // Add managers to map (prevents duplicates by ID)
             this.managers.set(match.manager1.id, match.manager1);
             this.managers.set(match.manager2.id, match.manager2);
-            // === MATCH POINTS ===
-            const man1MatchPoints = matchPointsWeekly.get(match.manager1.id) || [];
-            const man2MatchPoints = matchPointsWeekly.get(match.manager2.id) || [];
-            const man1LastMatchValue = man1MatchPoints[man1MatchPoints.length - 1] || 0;
-            const man2LastMatchValue = man2MatchPoints[man2MatchPoints.length - 1] || 0;
-            // Calculate new match points
+            minGameWeek = Math.min(minGameWeek, match.gameWeek);
+            maxGameWeek = Math.max(maxGameWeek, match.gameWeek);
+        }
+        // Track cumulative match points by actual gameweek number
+        const matchPointsByGW = new Map();
+        // Track cumulative absolute FPL points by actual gameweek number
+        const absolutePointsByGW = new Map();
+        // Initialize for all managers
+        for (const manager of this.managers.values()) {
+            matchPointsByGW.set(manager.id, new Map());
+            absolutePointsByGW.set(manager.id, new Map());
+        }
+        // Process each match and build cumulative points by actual gameweek
+        for (const match of happenedMatches) {
+            const gw = match.gameWeek;
+            // Get previous cumulative values (from previous gameweek)
+            const man1MatchMap = matchPointsByGW.get(match.manager1.id);
+            const man2MatchMap = matchPointsByGW.get(match.manager2.id);
+            const man1AbsMap = absolutePointsByGW.get(match.manager1.id);
+            const man2AbsMap = absolutePointsByGW.get(match.manager2.id);
+            // Find the last gameweek before this one where each manager played
+            let man1PrevMatch = 0;
+            let man2PrevMatch = 0;
+            let man1PrevAbs = 0;
+            let man2PrevAbs = 0;
+            for (let prevGW = gw - 1; prevGW >= minGameWeek; prevGW--) {
+                if (man1PrevMatch === 0 && man1MatchMap.has(prevGW)) {
+                    man1PrevMatch = man1MatchMap.get(prevGW);
+                    man1PrevAbs = man1AbsMap.get(prevGW);
+                }
+                if (man2PrevMatch === 0 && man2MatchMap.has(prevGW)) {
+                    man2PrevMatch = man2MatchMap.get(prevGW);
+                    man2PrevAbs = man2AbsMap.get(prevGW);
+                }
+                if (man1PrevMatch !== 0 && man2PrevMatch !== 0)
+                    break;
+            }
+            // Calculate new match points for this gameweek
+            let man1NewMatchPoints = man1PrevMatch;
+            let man2NewMatchPoints = man2PrevMatch;
             if (match.draw) {
-                man1MatchPoints.push(man1LastMatchValue + 1);
-                man2MatchPoints.push(man2LastMatchValue + 1);
+                man1NewMatchPoints += 1;
+                man2NewMatchPoints += 1;
+            }
+            else if (match.winnerId === match.manager1.id) {
+                man1NewMatchPoints += 3;
             }
             else {
-                if (match.winnerId === match.manager1.id) {
-                    man1MatchPoints.push(man1LastMatchValue + 3);
-                    man2MatchPoints.push(man2LastMatchValue);
-                }
-                else {
-                    man1MatchPoints.push(man1LastMatchValue);
-                    man2MatchPoints.push(man2LastMatchValue + 3);
+                man2NewMatchPoints += 3;
+            }
+            // Store cumulative points for this gameweek
+            man1MatchMap.set(gw, man1NewMatchPoints);
+            man2MatchMap.set(gw, man2NewMatchPoints);
+            man1AbsMap.set(gw, man1PrevAbs + match.manager1Points);
+            man2AbsMap.set(gw, man2PrevAbs + match.manager2Points);
+        }
+        // === BUILD ARRAYS FOR CHARTS (with all gameweeks) ===
+        const matchPointsWeekly = new Map();
+        const absolutePointsWeekly = new Map();
+        const relativeWeekly = new Map();
+        // Track which managers have started playing
+        const activeManagers = new Set();
+        // For each gameweek, calculate positions
+        for (let gw = minGameWeek; gw <= maxGameWeek; gw++) {
+            // First, check which managers played in this specific gameweek
+            for (const manager of this.managers.values()) {
+                const matchMap = matchPointsByGW.get(manager.id);
+                if (matchMap.has(gw)) {
+                    activeManagers.add(manager.id);
                 }
             }
-            matchPointsWeekly.set(match.manager1.id, man1MatchPoints);
-            matchPointsWeekly.set(match.manager2.id, man2MatchPoints);
-            // === ABSOLUTE POINTS ===
-            const man1AbsolutePoints = absolutePointsWeekly.get(match.manager1.id) || [];
-            const man2AbsolutePoints = absolutePointsWeekly.get(match.manager2.id) || [];
-            const man1LastAbsoluteValue = man1AbsolutePoints[man1AbsolutePoints.length - 1] || 0;
-            const man2LastAbsoluteValue = man2AbsolutePoints[man2AbsolutePoints.length - 1] || 0;
-            // Calculate cumulative absolute points
-            man1AbsolutePoints.push(man1LastAbsoluteValue + match.manager1Points);
-            man2AbsolutePoints.push(man2LastAbsoluteValue + match.manager2Points);
-            absolutePointsWeekly.set(match.manager1.id, man1AbsolutePoints);
-            absolutePointsWeekly.set(match.manager2.id, man2AbsolutePoints);
-        }
-        // === RELATIVE POSITIONS ===
-        const relativeWeekly = new Map();
-        const weekCount = Array.from(matchPointsWeekly.values())[0]?.length || 0;
-        for (let week = 0; week < weekCount; week++) {
-            // Get all managers' points for this week
             const weekPositions = [];
-            for (const manager of this.managers.values()) {
-                const matchPoints = matchPointsWeekly.get(manager.id)?.[week] || 0;
-                const absolutePoints = absolutePointsWeekly.get(manager.id)?.[week] || 0;
+            // Get all managers who have played by this gameweek
+            for (const managerId of activeManagers) {
+                const matchMap = matchPointsByGW.get(managerId);
+                const absMap = absolutePointsByGW.get(managerId);
+                // Find the most recent gameweek <= current gw where this manager played
+                let matchPoints = 0;
+                let absolutePoints = 0;
+                for (let searchGW = gw; searchGW >= minGameWeek; searchGW--) {
+                    if (matchMap.has(searchGW)) {
+                        matchPoints = matchMap.get(searchGW);
+                        absolutePoints = absMap.get(searchGW);
+                        break;
+                    }
+                }
                 weekPositions.push({
-                    managerId: manager.id,
+                    managerId,
                     matchPoints,
                     absolutePoints
                 });
@@ -178,11 +246,20 @@ export class ChartProcessor {
                 }
                 return b.matchPoints - a.matchPoints;
             });
-            // Assign positions
+            // Assign positions and build arrays for ALL active managers
             weekPositions.forEach((entry, position) => {
-                const managerArray = relativeWeekly.get(entry.managerId) || [];
-                managerArray.push(position + 1);
-                relativeWeekly.set(entry.managerId, managerArray);
+                // Add to match points array
+                const matchArray = matchPointsWeekly.get(entry.managerId) || [];
+                matchArray.push(entry.matchPoints);
+                matchPointsWeekly.set(entry.managerId, matchArray);
+                // Add to absolute points array
+                const absArray = absolutePointsWeekly.get(entry.managerId) || [];
+                absArray.push(entry.absolutePoints);
+                absolutePointsWeekly.set(entry.managerId, absArray);
+                // Add to relative positions array
+                const relArray = relativeWeekly.get(entry.managerId) || [];
+                relArray.push(position + 1);
+                relativeWeekly.set(entry.managerId, relArray);
             });
         }
         // === CREATE CHART MODELS ===

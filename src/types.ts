@@ -90,6 +90,7 @@ export interface LeagueDataModel {
     matches: H2HMatch[];
     totalMatches: number;
     lastUpdated: Date;
+    viewModels?: import('./viewModels.js').LeagueViewModels;
 }
 // ===== CHART TYPES =====
 

@@ -1,5 +1,4 @@
 // ===== UI LAYER =====
-import { ChartProcessor } from './chartProcessor.js';
 import { ChartRenderer } from './chartRenderer.js';
 /**
  * Escapes HTML to prevent XSS attacks
@@ -360,8 +359,12 @@ function populateStandingsPage(element, data) {
     if (loadingIndicator) {
         loadingIndicator.classList.remove('active');
     }
-    // Calculate standings from matches
-    const standings = calculateLeagueStandings(data.matches);
+    // Use pre-built standings from view models
+    if (!data.viewModels) {
+        console.error('❌ No view models available for standings');
+        return;
+    }
+    const standings = data.viewModels.standings;
     let html = `
         <div class="standings-container">
             <div class="league-table-wrapper">
@@ -402,69 +405,6 @@ function populateStandingsPage(element, data) {
     `;
     element.innerHTML = html;
 }
-function calculateLeagueStandings(matches) {
-    const managersMap = new Map();
-    // Process each match
-    matches.forEach(match => {
-        // Process entry 1
-        if (!managersMap.has(match.entry_1_name)) {
-            managersMap.set(match.entry_1_name, {
-                playerName: match.entry_1_player_name,
-                teamName: match.entry_1_name,
-                leaguePoints: 0,
-                totalPoints: 0,
-                wins: 0,
-                draws: 0,
-                losses: 0
-            });
-        }
-        // Process entry 2
-        if (!managersMap.has(match.entry_2_name)) {
-            managersMap.set(match.entry_2_name, {
-                playerName: match.entry_2_player_name,
-                teamName: match.entry_2_name,
-                leaguePoints: 0,
-                totalPoints: 0,
-                wins: 0,
-                draws: 0,
-                losses: 0
-            });
-        }
-        const manager1 = managersMap.get(match.entry_1_name);
-        const manager2 = managersMap.get(match.entry_2_name);
-        // Add total points
-        manager1.totalPoints += match.entry_1_points;
-        manager2.totalPoints += match.entry_2_points;
-        // Determine match result and update stats
-        if (match.entry_1_points > match.entry_2_points) {
-            // Entry 1 wins
-            manager1.wins++;
-            manager1.leaguePoints += 3;
-            manager2.losses++;
-        }
-        else if (match.entry_2_points > match.entry_1_points) {
-            // Entry 2 wins
-            manager2.wins++;
-            manager2.leaguePoints += 3;
-            manager1.losses++;
-        }
-        else if (match.entry_1_points > 0 && match.entry_2_points > 0) {
-            // Draw (only if both have played - non-zero points)
-            manager1.draws++;
-            manager1.leaguePoints += 1;
-            manager2.draws++;
-            manager2.leaguePoints += 1;
-        }
-    });
-    // Convert to array and sort by league points (descending), then by total points
-    const standings = Array.from(managersMap.values()).sort((a, b) => {
-        if (b.leaguePoints !== a.leaguePoints) {
-            return b.leaguePoints - a.leaguePoints;
-        }
-        return b.totalPoints - a.totalPoints;
-    });
-    return standings;
-}
 /**
  * Populates Matches page
  */
@@ -474,19 +414,25 @@ function populateMatchesPage(element, data) {
     if (loadingIndicator) {
         loadingIndicator.classList.remove('active');
     }
-    // Get unique managers
+    // Use pre-built matches view model
+    if (!data.viewModels) {
+        console.error('❌ No view models available for matches');
+        return;
+    }
+    const matchViewModels = data.viewModels.matches;
+    // Get unique managers from view models
     const managersSet = new Set();
-    data.matches.forEach(match => {
-        managersSet.add(match.entry_1_name);
-        managersSet.add(match.entry_2_name);
+    matchViewModels.forEach(match => {
+        managersSet.add(match.manager1TeamName);
+        managersSet.add(match.manager2TeamName);
     });
     const managers = Array.from(managersSet).sort();
     // Get all gameweeks sorted descending
-    const gameweeks = Array.from(new Set(data.matches.map(m => m.event))).sort((a, b) => b - a);
-    // Find last gameweek with played matches (both teams have non-zero points)
-    const currentGameweek = data.matches
-        .filter(m => m.entry_1_points > 0 && m.entry_2_points > 0)
-        .reduce((max, match) => Math.max(max, match.event), 0);
+    const gameweeks = Array.from(new Set(matchViewModels.map(m => m.gameWeek))).sort((a, b) => b - a);
+    // Find last gameweek with played matches
+    const currentGameweek = matchViewModels
+        .filter(m => m.result !== 'pending')
+        .reduce((max, match) => Math.max(max, match.gameWeek), 0);
     // If no played matches found, use the latest gameweek
     const defaultGameweek = currentGameweek > 0 ? currentGameweek : (gameweeks[0] || 1);
     // Create filter UI
@@ -515,7 +461,7 @@ function populateMatchesPage(element, data) {
     `;
     element.innerHTML = html;
     // Render matches with default filter (default gameweek)
-    renderFilteredMatches(data.matches, String(defaultGameweek), 'all');
+    renderFilteredMatches(matchViewModels, String(defaultGameweek), 'all');
     // Setup filter event listeners
     const gameweekFilter = document.getElementById('gameweek-filter');
     const managerFilter = document.getElementById('manager-filter');
@@ -525,14 +471,14 @@ function populateMatchesPage(element, data) {
             if (gameweekFilter.value !== 'all') {
                 managerFilter.value = 'all';
             }
-            renderFilteredMatches(data.matches, gameweekFilter.value, managerFilter.value);
+            renderFilteredMatches(matchViewModels, gameweekFilter.value, managerFilter.value);
         });
         managerFilter.addEventListener('change', () => {
             // Reset gameweek filter when manager changes
             if (managerFilter.value !== 'all') {
                 gameweekFilter.value = 'all';
             }
-            renderFilteredMatches(data.matches, gameweekFilter.value, managerFilter.value);
+            renderFilteredMatches(matchViewModels, gameweekFilter.value, managerFilter.value);
         });
     }
 }
@@ -547,10 +493,10 @@ function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
     let filteredMatches = matches;
     if (gameweekFilter !== 'all') {
         const gw = parseInt(gameweekFilter);
-        filteredMatches = filteredMatches.filter(m => m.event === gw);
+        filteredMatches = filteredMatches.filter(m => m.gameWeek === gw);
     }
     if (managerFilter !== 'all') {
-        filteredMatches = filteredMatches.filter(m => m.entry_1_name === managerFilter || m.entry_2_name === managerFilter);
+        filteredMatches = filteredMatches.filter(m => m.manager1TeamName === managerFilter || m.manager2TeamName === managerFilter);
     }
     // Group by gameweek if showing multiple gameweeks
     const matchesByGameweek = groupMatchesByGameweek(filteredMatches);
@@ -570,21 +516,19 @@ function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
                     <div class="matches-grid">
             `;
             gwMatches.forEach((match) => {
-                const winner = match.entry_1_points > match.entry_2_points ? 1 :
-                    match.entry_2_points > match.entry_1_points ? 2 : 0;
                 // Highlight the filtered manager if applicable
-                const isEntry1Highlighted = managerFilter !== 'all' && match.entry_1_name === managerFilter;
-                const isEntry2Highlighted = managerFilter !== 'all' && match.entry_2_name === managerFilter;
+                const isEntry1Highlighted = managerFilter !== 'all' && match.manager1TeamName === managerFilter;
+                const isEntry2Highlighted = managerFilter !== 'all' && match.manager2TeamName === managerFilter;
                 html += `
                     <div class="match-card">
-                        <div class="match-entry ${winner === 1 ? 'winner' : ''} ${isEntry1Highlighted ? 'highlighted' : ''}">
-                            <span class="team-name">${escapeHtml(match.entry_1_name)}</span>
-                            <span class="points">${match.entry_1_points}</span>
+                        <div class="match-entry ${match.result === 'win1' ? 'winner' : ''} ${isEntry1Highlighted ? 'highlighted' : ''}">
+                            <span class="team-name">${escapeHtml(match.manager1TeamName)}</span>
+                            <span class="points">${match.manager1Points}</span>
                         </div>
                         <div class="match-vs">vs</div>
-                        <div class="match-entry ${winner === 2 ? 'winner' : ''} ${isEntry2Highlighted ? 'highlighted' : ''}">
-                            <span class="team-name">${escapeHtml(match.entry_2_name)}</span>
-                            <span class="points">${match.entry_2_points}</span>
+                        <div class="match-entry ${match.result === 'win2' ? 'winner' : ''} ${isEntry2Highlighted ? 'highlighted' : ''}">
+                            <span class="team-name">${escapeHtml(match.manager2TeamName)}</span>
+                            <span class="points">${match.manager2Points}</span>
                         </div>
                     </div>
                 `;
@@ -612,11 +556,6 @@ function populateStatisticsPage(element, data) {
     const loadingIndicator = element.querySelector('.loading-indicator');
     if (loadingIndicator) {
         loadingIndicator.classList.remove('active');
-    }
-    // Check if already populated to avoid re-rendering
-    if (element.hasAttribute('data-charts-initialized')) {
-        console.log('✅ Charts page already initialized, skipping re-render');
-        return;
     }
     // Destroy any existing chart instances before recreating HTML
     if (absoluteChartRenderer) {
@@ -664,11 +603,14 @@ function populateStatisticsPage(element, data) {
                 `;
                 return;
             }
-            console.log('✅ Chart.js loaded, processing data...');
-            // Process data to get chart models
-            const processor = new ChartProcessor(data.matches);
-            const chartData = processor.process();
-            console.log(`📈 Processed ${chartData.absoluteManagers.length} managers for charts`);
+            console.log('✅ Chart.js loaded, using pre-built chart data...');
+            // Use pre-built chart data from view models
+            if (!data.viewModels) {
+                console.error('❌ No view models available for charts');
+                return;
+            }
+            const chartData = data.viewModels.charts;
+            console.log(`📈 Using chart data for ${chartData.absoluteManagers.length} managers`);
             // Create chart renderers (store globally for lifecycle management)
             absoluteChartRenderer = new ChartRenderer();
             relativeChartRenderer = new ChartRenderer();
@@ -698,11 +640,9 @@ function populateStatisticsPage(element, data) {
                     else {
                         absoluteSection?.classList.add('hidden');
                         relativeSection?.classList.remove('hidden');
-                        // Render relative chart on first view
-                        if (!relativeSection?.hasAttribute('data-rendered') && relativeChartRenderer) {
-                            console.log('🎨 Rendering relative chart...');
+                        // Always render relative chart when switching to it (to handle data updates)
+                        if (relativeChartRenderer) {
                             relativeChartRenderer.renderChart('relative-chart', chartData.relativeManagers, 'relative', 'relative-legend');
-                            relativeSection?.setAttribute('data-rendered', 'true');
                         }
                     }
                 });
@@ -742,11 +682,11 @@ function populateHistoryPage(element, _data) {
 function groupMatchesByGameweek(matches) {
     const grouped = {};
     matches.forEach(match => {
-        const eventNum = match.event;
-        if (!grouped[eventNum]) {
-            grouped[eventNum] = [];
+        const gameWeek = match.gameWeek;
+        if (!grouped[gameWeek]) {
+            grouped[gameWeek] = [];
         }
-        grouped[eventNum].push(match);
+        grouped[gameWeek].push(match);
     });
     return grouped;
 }

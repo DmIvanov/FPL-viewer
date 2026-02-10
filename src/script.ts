@@ -6,6 +6,9 @@ import type { FPLManager } from './types.js';
 // Import API layer
 import { fetchRealFPLData, fetchH2HMatches, clearLeagueCache } from './api.js';
 
+// Import view models builder
+import { buildLeagueViewModels } from './viewModels.js';
+
 // Import UI layer
 import {
     setupMobileMenu,
@@ -146,12 +149,14 @@ async function fetchLeagueData(forceRefresh: boolean = false): Promise<void> {
     try {
         // Fetch H2H matches with progressive updates
         const leagueData = await fetchH2HMatches((matches, isComplete) => {
-            // If complete, populate all tabs
+            // If complete, build view models and populate all tabs
             if (isComplete) {
+                const viewModels = buildLeagueViewModels(matches);
                 const progressData = {
                     matches,
                     totalMatches: matches.length,
-                    lastUpdated: new Date()
+                    lastUpdated: new Date(),
+                    viewModels
                 };
                 setupLeagueSubtabs(progressData);
             }
@@ -159,7 +164,21 @@ async function fetchLeagueData(forceRefresh: boolean = false): Promise<void> {
         
         console.log(`✅ Successfully loaded ${leagueData.matches.length} H2H matches`);
         
-        // Final setup with complete data
+        // Build view models from complete data
+        const viewModels = buildLeagueViewModels(leagueData.matches);
+        console.log('✅ View models built:', {
+            standings: viewModels.standings.length,
+            matches: viewModels.matches.length,
+            charts: {
+                absolute: viewModels.charts.absoluteManagers.length,
+                relative: viewModels.charts.relativeManagers.length
+            }
+        });
+        
+        // Attach view models to league data
+        leagueData.viewModels = viewModels;
+        
+        // Final setup with complete data and view models
         setupLeagueSubtabs(leagueData);
         
         // Hide loading state
