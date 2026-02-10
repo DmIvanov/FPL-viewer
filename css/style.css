@@ -896,6 +896,276 @@ h2::after {
     display: flex;
 }
 
+/* Football field animation area */
+.football-field {
+    position: relative;
+    width: 280px;
+    height: 120px;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px dashed rgba(56, 178, 172, 0.3);
+}
+
+.football {
+    position: absolute;
+    width: 76px;
+    height: 76px;
+    animation: kick-ball 3s ease-in-out infinite;
+    /* Make image crisp */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    object-fit: contain;
+}
+
+/* Remove pseudo-elements */
+.football::before,
+.football::after {
+    display: none;
+}
+
+.shadow {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    animation: shadow-follow 3s ease-in-out infinite;
+}
+
+.loading-text {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    animation: fade-pulse 2s ease-in-out infinite;
+}
+
+/* Ball trajectory: parabolic kick from left to right, bounce, return */
+@keyframes kick-ball {
+    0% {
+        left: 0;
+        bottom: 0;
+        transform: rotate(0deg);
+    }
+    5% {
+        left: 28px;
+        bottom: 23px;
+        transform: rotate(45deg);
+    }
+    10% {
+        left: 56px;
+        bottom: 45px;
+        transform: rotate(90deg);
+    }
+    15% {
+        left: 84px;
+        bottom: 68px;
+        transform: rotate(135deg);
+    }
+    20% {
+        left: 112px;
+        bottom: 83px;
+        transform: rotate(180deg);
+    }
+    25% {
+        left: 140px;
+        bottom: 90px;
+        transform: rotate(225deg);
+    }
+    30% {
+        left: 168px;
+        bottom: 83px;
+        transform: rotate(270deg);
+    }
+    35% {
+        left: 196px;
+        bottom: 68px;
+        transform: rotate(315deg);
+    }
+    40% {
+        left: 224px;
+        bottom: 45px;
+        transform: rotate(360deg);
+    }
+    45% {
+        left: 238px;
+        bottom: 15px;
+        transform: rotate(405deg);
+    }
+    /* Bounce off right side */
+    50% {
+        left: 231px;
+        bottom: 0;
+        transform: rotate(450deg);
+    }
+    52% {
+        left: 227px;
+        bottom: 12px;
+        transform: rotate(468deg);
+    }
+    54% {
+        left: 224px;
+        bottom: 23px;
+        transform: rotate(486deg);
+    }
+    56% {
+        left: 217px;
+        bottom: 27px;
+        transform: rotate(504deg);
+    }
+    58% {
+        left: 210px;
+        bottom: 18px;
+        transform: rotate(522deg);
+    }
+    60% {
+        left: 203px;
+        bottom: 8px;
+        transform: rotate(540deg);
+    }
+    /* Arc back to the left */
+    65% {
+        left: 175px;
+        bottom: 38px;
+        transform: rotate(585deg);
+    }
+    70% {
+        left: 147px;
+        bottom: 60px;
+        transform: rotate(630deg);
+    }
+    75% {
+        left: 119px;
+        bottom: 72px;
+        transform: rotate(675deg);
+    }
+    80% {
+        left: 91px;
+        bottom: 72px;
+        transform: rotate(720deg);
+    }
+    85% {
+        left: 63px;
+        bottom: 60px;
+        transform: rotate(765deg);
+    }
+    90% {
+        left: 35px;
+        bottom: 38px;
+        transform: rotate(810deg);
+    }
+    95% {
+        left: 14px;
+        bottom: 12px;
+        transform: rotate(855deg);
+    }
+    100% {
+        left: 0;
+        bottom: 0;
+        transform: rotate(900deg);
+    }
+}
+
+/* Shadow follows ball with size/opacity changes based on height */
+@keyframes shadow-follow {
+    0% {
+        left: 20px;
+        bottom: -2px;
+        width: 30px;
+        height: 6px;
+        opacity: 0.4;
+    }
+    10% {
+        left: 76px;
+        bottom: -2px;
+        width: 20px;
+        height: 4px;
+        opacity: 0.25;
+    }
+    20% {
+        left: 132px;
+        bottom: -2px;
+        width: 14px;
+        height: 3px;
+        opacity: 0.18;
+    }
+    25% {
+        left: 160px;
+        bottom: -2px;
+        width: 12px;
+        height: 3px;
+        opacity: 0.15;
+    }
+    30% {
+        left: 188px;
+        bottom: -2px;
+        width: 14px;
+        height: 3px;
+        opacity: 0.18;
+    }
+    40% {
+        left: 244px;
+        bottom: -2px;
+        width: 20px;
+        height: 4px;
+        opacity: 0.25;
+    }
+    50% {
+        left: 251px;
+        bottom: -2px;
+        width: 30px;
+        height: 6px;
+        opacity: 0.4;
+    }
+    54% {
+        left: 244px;
+        bottom: -2px;
+        width: 25px;
+        height: 5px;
+        opacity: 0.3;
+    }
+    60% {
+        left: 223px;
+        bottom: -2px;
+        width: 27px;
+        height: 6px;
+        opacity: 0.35;
+    }
+    70% {
+        left: 167px;
+        bottom: -2px;
+        width: 16px;
+        height: 4px;
+        opacity: 0.2;
+    }
+    80% {
+        left: 111px;
+        bottom: -2px;
+        width: 14px;
+        height: 3px;
+        opacity: 0.18;
+    }
+    90% {
+        left: 55px;
+        bottom: -2px;
+        width: 20px;
+        height: 4px;
+        opacity: 0.25;
+    }
+    100% {
+        left: 20px;
+        bottom: -2px;
+        width: 30px;
+        height: 6px;
+        opacity: 0.4;
+    }
+}
+
+@keyframes fade-pulse {
+    0%, 100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
 .cup-standings-container {
     background: var(--background);
     border-radius: 15px;
