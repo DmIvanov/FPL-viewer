@@ -355,6 +355,11 @@ function populateLeaguePage(pageName, data) {
  * Populates Standings page
  */
 function populateStandingsPage(element, data) {
+    // Hide loading indicator first
+    const loadingIndicator = element.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
     // Calculate standings from matches
     const standings = calculateLeagueStandings(data.matches);
     let html = `
@@ -464,6 +469,11 @@ function calculateLeagueStandings(matches) {
  * Populates Matches page
  */
 function populateMatchesPage(element, data) {
+    // Hide loading indicator if present
+    const loadingIndicator = element.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
     // Get unique managers
     const managersSet = new Set();
     data.matches.forEach(match => {
@@ -598,6 +608,11 @@ let absoluteChartRenderer = null;
 let relativeChartRenderer = null;
 function populateStatisticsPage(element, data) {
     console.log('📊 Populating Charts page...');
+    // Hide loading indicator if present
+    const loadingIndicator = element.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
     // Check if already populated to avoid re-rendering
     if (element.hasAttribute('data-charts-initialized')) {
         console.log('✅ Charts page already initialized, skipping re-render');

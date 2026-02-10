@@ -411,6 +411,12 @@ function populateLeaguePage(pageName: string | null, data: LeagueDataModel): voi
  * Populates Standings page
  */
 function populateStandingsPage(element: HTMLElement, data: LeagueDataModel): void {
+    // Hide loading indicator first
+    const loadingIndicator = element.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
+    
     // Calculate standings from matches
     const standings = calculateLeagueStandings(data.matches);
     
@@ -544,6 +550,12 @@ function calculateLeagueStandings(matches: H2HMatch[]): ManagerStanding[] {
  * Populates Matches page
  */
 function populateMatchesPage(element: HTMLElement, data: LeagueDataModel): void {
+    // Hide loading indicator if present
+    const loadingIndicator = element.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
+    
     // Get unique managers
     const managersSet = new Set<string>();
     data.matches.forEach(match => {
@@ -704,6 +716,12 @@ let relativeChartRenderer: ChartRenderer | null = null;
 
 function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): void {
     console.log('📊 Populating Charts page...');
+    
+    // Hide loading indicator if present
+    const loadingIndicator = element.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
     
     // Check if already populated to avoid re-rendering
     if (element.hasAttribute('data-charts-initialized')) {
