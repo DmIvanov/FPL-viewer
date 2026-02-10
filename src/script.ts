@@ -147,20 +147,8 @@ async function fetchLeagueData(forceRefresh: boolean = false): Promise<void> {
     showLeagueLoadingState();
     
     try {
-        // Fetch H2H matches with progressive updates
-        const leagueData = await fetchH2HMatches((matches, isComplete) => {
-            // If complete, build view models and populate all tabs
-            if (isComplete) {
-                const viewModels = buildLeagueViewModels(matches);
-                const progressData = {
-                    matches,
-                    totalMatches: matches.length,
-                    lastUpdated: new Date(),
-                    viewModels
-                };
-                setupLeagueSubtabs(progressData);
-            }
-        });
+        // Fetch H2H matches (wait for all data before displaying)
+        const leagueData = await fetchH2HMatches();
         
         console.log(`✅ Successfully loaded ${leagueData.matches.length} H2H matches`);
         

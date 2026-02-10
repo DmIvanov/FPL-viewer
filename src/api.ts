@@ -227,15 +227,15 @@ export async function fetchH2HMatches(
                         if (i === pageResults.length - 1 && pageData.has_next) {
                             hasNext = true;
                         }
-                        
-                        // Notify progress after each batch
-                        if (onProgress) {
-                            onProgress([...allMatches], !hasNext);
-                        }
                     } else {
                         // If we get a null result, assume we've reached the end
                         break;
                     }
+                }
+                
+                // Notify progress once per batch (after all pages in batch are processed)
+                if (onProgress) {
+                    onProgress([...allMatches], !hasNext);
                 }
                 
                 currentPage += BATCH_SIZE;
