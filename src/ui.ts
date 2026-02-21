@@ -411,7 +411,7 @@ async function populateLeaguePage(
     }
     
     // Check if page requires matches data
-    const requiresMatches = pageName === 'matches' || pageName === 'statistics';
+    const requiresMatches = pageName === 'matches' || pageName === 'statistics' || pageName === 'topscores';
     const hasMatches = data.viewModels?.matches && data.viewModels?.charts;
     
     // If page requires matches but they're not loaded yet, trigger lazy load
@@ -455,8 +455,10 @@ async function populateLeaguePage(
                 populateStatisticsPage(contentElement, data);
             }
             break;
-        case 'history':
-            populateHistoryPage(contentElement, data);
+        case 'topscores':
+            if (data.viewModels?.matches) {
+                populateTopScoresPage(contentElement, data);
+            }
             break;
         default:
             console.warn(`⚠️ Unknown page: ${pageName}`);
@@ -693,14 +695,27 @@ function renderFilteredMatches(matches: MatchViewModel[], gameweekFilter: string
                 const isEntry1Highlighted = managerFilter !== 'all' && match.manager1TeamName === managerFilter;
                 const isEntry2Highlighted = managerFilter !== 'all' && match.manager2TeamName === managerFilter;
                 
+                // Determine winner/loser classes
+                let entry1Class = '';
+                let entry2Class = '';
+                
+                if (match.result === 'win1') {
+                    entry1Class = 'winner';
+                    entry2Class = 'loser';
+                } else if (match.result === 'win2') {
+                    entry1Class = 'loser';
+                    entry2Class = 'winner';
+                }
+                // Draw: no winner/loser classes
+                
                 html += `
                     <div class="match-card">
-                        <div class="match-entry ${match.result === 'win1' ? 'winner' : ''} ${isEntry1Highlighted ? 'highlighted' : ''}">
+                        <div class="match-entry ${entry1Class} ${isEntry1Highlighted ? 'highlighted' : ''}">
                             <span class="team-name">${escapeHtml(match.manager1TeamName)}</span>
                             <span class="points">${match.manager1Points}</span>
                         </div>
                         <div class="match-vs">vs</div>
-                        <div class="match-entry ${match.result === 'win2' ? 'winner' : ''} ${isEntry2Highlighted ? 'highlighted' : ''}">
+                        <div class="match-entry ${entry2Class} ${isEntry2Highlighted ? 'highlighted' : ''}">
                             <span class="team-name">${escapeHtml(match.manager2TeamName)}</span>
                             <span class="points">${match.manager2Points}</span>
                         </div>
@@ -879,14 +894,104 @@ function populateStatisticsPage(element: HTMLElement, data: LeagueDataModel): vo
 }
 
 /**
- * Populates History page
+ * Populates Top Scores page
  */
-function populateHistoryPage(element: HTMLElement, _data: LeagueDataModel): void {
-    element.innerHTML = `
-        <div class="history-container">
-            <p>📜 Historical trends and patterns will be shown here.</p>
+function populateTopScoresPage(element: HTMLElement, data: LeagueDataModel): void {
+    if (!data.viewModels?.matches) {
+        element.innerHTML = '<p>No matches data available.</p>';
+        return;
+    }
+    
+    const matches = data.viewModels.matches;
+    
+    // Create array of all individual scores with match details
+    interface ScoreEntry {
+        score: number;
+        managerName: string;
+        teamName: string;
+        opponentName: string;
+        opponentTeamName: string;
+        opponentScore: number;
+        gameWeek: number;
+        result: string;
+    }
+    
+    const allScores: ScoreEntry[] = [];
+    
+    matches.forEach(match => {
+        // Only include finished matches
+        if (match.result !== 'pending') {
+            // Add manager 1's score
+            allScores.push({
+                score: match.manager1Points,
+                managerName: match.manager1Name,
+                teamName: match.manager1TeamName,
+                opponentName: match.manager2Name,
+                opponentTeamName: match.manager2TeamName,
+                opponentScore: match.manager2Points,
+                gameWeek: match.gameWeek,
+                result: match.result === 'win1' ? 'W' : match.result === 'draw' ? 'D' : 'L'
+            });
+            
+            // Add manager 2's score
+            allScores.push({
+                score: match.manager2Points,
+                managerName: match.manager2Name,
+                teamName: match.manager2TeamName,
+                opponentName: match.manager1Name,
+                opponentTeamName: match.manager1TeamName,
+                opponentScore: match.manager1Points,
+                gameWeek: match.gameWeek,
+                result: match.result === 'win2' ? 'W' : match.result === 'draw' ? 'D' : 'L'
+            });
+        }
+    });
+    
+    // Sort by score descending and take top 10
+    const topScores = allScores
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+    
+    // Build HTML
+    let html = `
+        <div class="top-scores-container">
+            <p class="section-description">🏆 Highest individual scores across all gameweeks</p>
+            <div class="top-scores-list">
+    `;
+    
+    topScores.forEach((entry, index) => {
+        const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        const resultClass = entry.result === 'W' ? 'win' : entry.result === 'D' ? 'draw' : 'loss';
+        const resultEmoji = entry.result === 'W' ? '✅' : entry.result === 'D' ? '🤝' : '❌';
+        
+        html += `
+            <div class="top-score-card">
+                <div class="rank">${rankEmoji}</div>
+                <div class="score-details">
+                    <div class="score-header">
+                        <span class="big-score">${entry.score} pts</span>
+                        <span class="result-badge ${resultClass}">${resultEmoji} ${entry.result}</span>
+                    </div>
+                    <div class="manager-info">
+                        <strong>${escapeHtml(entry.teamName)}</strong> <span class="manager-name">(${escapeHtml(entry.managerName)})</span>
+                    </div>
+                    <div class="match-info">
+                        <span class="vs-text">vs</span> ${escapeHtml(entry.opponentTeamName)} <span class="opponent-score">(${entry.opponentScore} pts)</span>
+                    </div>
+                    <div class="gameweek-info">
+                        📅 Gameweek ${entry.gameWeek}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
         </div>
     `;
+    
+    element.innerHTML = html;
 }
 
 /**
