@@ -1,8 +1,8 @@
 // ===== MAIN APPLICATION ENTRY POINT =====
 // Import API layer
-import { fetchRealFPLData, fetchH2HMatches, clearLeagueCache } from './api.js';
+import { fetchRealFPLData, fetchH2HMatches, fetchH2HStandings, clearLeagueCache } from './api.js';
 // Import view models builder
-import { buildLeagueViewModels } from './viewModels.js';
+import { buildLeagueViewModels, buildStandingsOnlyViewModel } from './viewModels.js';
 // Import UI layer
 import { setupMobileMenu, setupSmoothScrolling, setupIntersectionObserver, setupKeyboardAccessibility, setupResizeHandler, initializeFPLFeatures, initializeTabSwitching, setupTabSwitchingListeners, showLoadingState, populateCupTable, showLeagueLoadingState, hideLeagueLoadingState, setupLeagueSubtabs } from './ui.js';
 // Import utilities
@@ -39,6 +39,9 @@ window.addEventListener('error', (event) => {
     // In a real project, you might want to report this to an error tracking service
 });
 // ===== DATA FETCHING & COORDINATION =====
+// Track if matches have been loaded for lazy loading
+let matchesDataLoaded = false;
+let currentLeagueData = null;
 /**
  * Sets up the refresh button for League data
  */
@@ -47,6 +50,7 @@ function setupRefreshButton() {
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
             console.log('🔄 Manual refresh triggered');
+            matchesDataLoaded = false; // Reset matches loaded flag
             fetchLeagueData(true);
         });
     }
@@ -89,14 +93,17 @@ async function fetchCupStandings() {
     }
 }
 /**
- * Fetches League H2H data and updates the UI progressively
- * Coordinates between the API layer and UI layer for the League tab
+ * Fetches League H2H data using optimized approach:
+ * - Fast path: Only load standings for initial view (1 API call)
+ * - Lazy loading: Load full matches when needed for Matches/Charts tabs
  */
 async function fetchLeagueData(forceRefresh = false) {
     console.log(`🏆 Fetching League H2H data${forceRefresh ? ' (force refresh)' : ''}...`);
     // Clear cache if force refresh
     if (forceRefresh) {
         clearLeagueCache();
+        matchesDataLoaded = false;
+        currentLeagueData = null;
         // Clear chart initialization flag to allow re-rendering
         const statisticsContent = document.getElementById('statistics-content');
         if (statisticsContent) {
@@ -106,25 +113,21 @@ async function fetchLeagueData(forceRefresh = false) {
     // Show loading state (UI layer)
     showLeagueLoadingState();
     try {
-        // Fetch H2H matches (wait for all data before displaying)
-        const leagueData = await fetchH2HMatches();
-        console.log(`✅ Successfully loaded ${leagueData.matches.length} H2H matches`);
-        // Build view models from complete data
-        const viewModels = buildLeagueViewModels(leagueData.matches);
-        console.log('✅ View models built:', {
-            standings: viewModels.standings.length,
-            matches: viewModels.matches.length,
-            charts: {
-                absolute: viewModels.charts.absoluteManagers.length,
-                relative: viewModels.charts.relativeManagers.length
-            }
-        });
+        // FAST PATH: Fetch only standings data (single API call)
+        console.log('⚡ Using fast path: Loading standings only...');
+        const standingsData = await fetchH2HStandings();
+        console.log(`✅ Successfully loaded standings for ${standingsData.standings?.length || 0} managers`);
+        // Build standings-only view models
+        const viewModels = buildStandingsOnlyViewModel(standingsData.standings);
+        console.log('✅ Standings view model built');
         // Attach view models to league data
-        leagueData.viewModels = viewModels;
-        // Final setup with complete data and view models
-        setupLeagueSubtabs(leagueData);
+        standingsData.viewModels = viewModels;
+        currentLeagueData = standingsData;
+        // Setup UI with standings data and lazy-loading callback
+        setupLeagueSubtabs(standingsData, loadMatchesData);
         // Hide loading state
         hideLeagueLoadingState();
+        console.log('⚡ Fast load complete! Matches will load on-demand.');
     }
     catch (error) {
         console.error('❌ Failed to load League data:', error);
@@ -145,6 +148,74 @@ async function fetchLeagueData(forceRefresh = false) {
                 retryBtn.addEventListener('click', () => fetchLeagueData(true));
             }
         }
+    }
+}
+/**
+ * Lazy loads full matches data when needed for Matches or Charts tabs
+ * Returns the updated league data with matches and full view models
+ */
+export async function loadMatchesData() {
+    // If already loaded, return current data
+    if (matchesDataLoaded && currentLeagueData?.matches) {
+        console.log('✅ Matches data already loaded');
+        return currentLeagueData;
+    }
+    console.log('📊 Lazy loading matches data...');
+    try {
+        // Show loading indicator in matches/charts content areas
+        const matchesContent = document.getElementById('matches-content');
+        const statisticsContent = document.getElementById('statistics-content');
+        if (matchesContent) {
+            matchesContent.innerHTML = '<div class="loading-indicator active">Loading matches...</div>';
+        }
+        if (statisticsContent) {
+            statisticsContent.innerHTML = '<div class="loading-indicator active">Loading chart data...</div>';
+        }
+        // Fetch all H2H matches
+        const matchesData = await fetchH2HMatches();
+        console.log(`✅ Successfully loaded ${matchesData.matches?.length || 0} H2H matches`);
+        // Build full view models from matches
+        const viewModels = buildLeagueViewModels(matchesData.matches);
+        console.log('✅ Full view models built:', {
+            standings: viewModels.standings.length,
+            matches: viewModels.matches?.length || 0,
+            charts: {
+                absolute: viewModels.charts?.absoluteManagers.length || 0,
+                relative: viewModels.charts?.relativeManagers.length || 0
+            }
+        });
+        // Merge with existing standings data
+        if (currentLeagueData && matchesData.matches && matchesData.totalMatches !== undefined) {
+            currentLeagueData.matches = matchesData.matches;
+            currentLeagueData.totalMatches = matchesData.totalMatches;
+            currentLeagueData.viewModels = viewModels;
+        }
+        else {
+            // If no current data, use matches data directly
+            matchesData.viewModels = viewModels;
+            currentLeagueData = matchesData;
+        }
+        matchesDataLoaded = true;
+        // Re-setup UI with full data and continue using lazy-loading callback
+        setupLeagueSubtabs(currentLeagueData, loadMatchesData);
+        return currentLeagueData;
+    }
+    catch (error) {
+        console.error('❌ Failed to load matches data:', error);
+        // Show error in both matches and charts areas
+        const errorHtml = `
+            <div class="error-message">
+                <h3>Unable to load detailed data</h3>
+                <p>Failed to load match details. Please try again.</p>
+            </div>
+        `;
+        const matchesContent = document.getElementById('matches-content');
+        const statisticsContent = document.getElementById('statistics-content');
+        if (matchesContent)
+            matchesContent.innerHTML = errorHtml;
+        if (statisticsContent)
+            statisticsContent.innerHTML = errorHtml;
+        return null;
     }
 }
 console.log('⚽ FPL Analytics Dashboard loaded and ready!');

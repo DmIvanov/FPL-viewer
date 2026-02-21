@@ -1,7 +1,7 @@
 // ===== VIEW MODELS BUILDER =====
 // Processes raw H2H match data into separate view models for each League subsection
 
-import type { H2HMatch } from './types.js';
+import type { H2HMatch, H2HStandingEntry } from './types.js';
 import { ChartProcessor } from './chartProcessor.js';
 
 /**
@@ -54,27 +54,56 @@ export interface ChartViewModel {
  */
 export interface LeagueViewModels {
     standings: ManagerStanding[];
-    matches: MatchViewModel[];
-    charts: ChartViewModel;
+    matches?: MatchViewModel[]; // Optional - only if matches are loaded
+    charts?: ChartViewModel; // Optional - only if matches are loaded
 }
 
 /**
- * Builds all view models from raw match data
+ * Builds view models from H2H standings data (fast path)
+ * Only builds standings, matches and charts require separate data
+ */
+export function buildStandingsOnlyViewModel(standings: H2HStandingEntry[]): LeagueViewModels {
+    return {
+        standings: buildStandingsFromAPIStandings(standings)
+    };
+}
+
+/**
+ * Builds all view models from raw match data (full data path)
  * This is the single source of truth for processing match data
  */
 export function buildLeagueViewModels(matches: H2HMatch[]): LeagueViewModels {
     return {
-        standings: buildStandingsViewModel(matches),
+        standings: buildStandingsFromMatches(matches),
         matches: buildMatchesViewModel(matches),
         charts: buildChartsViewModel(matches)
     };
 }
 
 /**
- * Builds the Standings view model
+ * Builds the Standings view model from H2H API standings endpoint (fast path)
+ * Directly converts API standings data to view model format
+ */
+function buildStandingsFromAPIStandings(standings: H2HStandingEntry[]): ManagerStanding[] {
+    const standingsViewModel = standings.map(entry => ({
+        playerName: entry.player_name,
+        teamName: entry.entry_name,
+        leaguePoints: entry.total, // Total league points (W=3, D=1)
+        totalPoints: entry.points_for, // Total FPL points
+        wins: entry.matches_won,
+        draws: entry.matches_drawn,
+        losses: entry.matches_lost
+    }));
+    
+    console.log('✅ Built standings from API for', standingsViewModel.length, 'managers');
+    return standingsViewModel;
+}
+
+/**
+ * Builds the Standings view model from H2H matches (computed from match data)
  * Calculates league points (W=3, D=1, L=0) and aggregates match statistics
  */
-function buildStandingsViewModel(matches: H2HMatch[]): ManagerStanding[] {
+function buildStandingsFromMatches(matches: H2HMatch[]): ManagerStanding[] {
     const managersMap = new Map<string, ManagerStanding>();
     
     // Process each match
@@ -151,8 +180,15 @@ function buildStandingsViewModel(matches: H2HMatch[]): ManagerStanding[] {
 function buildMatchesViewModel(matches: H2HMatch[]): MatchViewModel[] {
     const matchViewModels = matches.map(match => {
         // Determine result
+        // Match is finished if:
+        // 1. finished field is explicitly true, OR
+        // 2. Both teams have non-zero scores (0-0 draws shouldn't happen in FPL)
+        const hasScores = typeof match.entry_1_points === 'number' && typeof match.entry_2_points === 'number';
+        const isReallyFinished = match.finished === true || 
+                                (hasScores && (match.entry_1_points > 0 || match.entry_2_points > 0));
+        
         let result: 'win1' | 'win2' | 'draw' | 'pending';
-        if (!match.finished) {
+        if (!isReallyFinished) {
             result = 'pending';
         } else if (match.entry_1_points > match.entry_2_points) {
             result = 'win1';

@@ -882,8 +882,288 @@ h2::after {
 }
 
 .loading-indicator {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
     color: var(--text-secondary);
     font-style: italic;
+    font-size: 1.1rem;
+}
+
+.loading-indicator.active {
+    display: flex;
+}
+
+/* Football field animation area */
+.football-field {
+    position: relative;
+    width: 280px;
+    height: 120px;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px dashed rgba(56, 178, 172, 0.3);
+}
+
+.football {
+    position: absolute;
+    width: 76px;
+    height: 76px;
+    animation: kick-ball 3s ease-in-out infinite;
+    /* Make image crisp */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    object-fit: contain;
+}
+
+/* Remove pseudo-elements */
+.football::before,
+.football::after {
+    display: none;
+}
+
+.shadow {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    animation: shadow-follow 3s ease-in-out infinite;
+}
+
+.loading-text {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    animation: fade-pulse 2s ease-in-out infinite;
+}
+
+/* Ball trajectory: parabolic kick from left to right, bounce, return */
+@keyframes kick-ball {
+    0% {
+        left: 0;
+        bottom: 0;
+        transform: rotate(0deg);
+    }
+    5% {
+        left: 28px;
+        bottom: 23px;
+        transform: rotate(45deg);
+    }
+    10% {
+        left: 56px;
+        bottom: 45px;
+        transform: rotate(90deg);
+    }
+    15% {
+        left: 84px;
+        bottom: 68px;
+        transform: rotate(135deg);
+    }
+    20% {
+        left: 112px;
+        bottom: 83px;
+        transform: rotate(180deg);
+    }
+    25% {
+        left: 140px;
+        bottom: 90px;
+        transform: rotate(225deg);
+    }
+    30% {
+        left: 168px;
+        bottom: 83px;
+        transform: rotate(270deg);
+    }
+    35% {
+        left: 196px;
+        bottom: 68px;
+        transform: rotate(315deg);
+    }
+    40% {
+        left: 224px;
+        bottom: 45px;
+        transform: rotate(360deg);
+    }
+    45% {
+        left: 238px;
+        bottom: 15px;
+        transform: rotate(405deg);
+    }
+    /* Bounce off right side */
+    50% {
+        left: 231px;
+        bottom: 0;
+        transform: rotate(450deg);
+    }
+    52% {
+        left: 227px;
+        bottom: 12px;
+        transform: rotate(468deg);
+    }
+    54% {
+        left: 224px;
+        bottom: 23px;
+        transform: rotate(486deg);
+    }
+    56% {
+        left: 217px;
+        bottom: 27px;
+        transform: rotate(504deg);
+    }
+    58% {
+        left: 210px;
+        bottom: 18px;
+        transform: rotate(522deg);
+    }
+    60% {
+        left: 203px;
+        bottom: 8px;
+        transform: rotate(540deg);
+    }
+    /* Arc back to the left */
+    65% {
+        left: 175px;
+        bottom: 38px;
+        transform: rotate(585deg);
+    }
+    70% {
+        left: 147px;
+        bottom: 60px;
+        transform: rotate(630deg);
+    }
+    75% {
+        left: 119px;
+        bottom: 72px;
+        transform: rotate(675deg);
+    }
+    80% {
+        left: 91px;
+        bottom: 72px;
+        transform: rotate(720deg);
+    }
+    85% {
+        left: 63px;
+        bottom: 60px;
+        transform: rotate(765deg);
+    }
+    90% {
+        left: 35px;
+        bottom: 38px;
+        transform: rotate(810deg);
+    }
+    95% {
+        left: 14px;
+        bottom: 12px;
+        transform: rotate(855deg);
+    }
+    100% {
+        left: 0;
+        bottom: 0;
+        transform: rotate(900deg);
+    }
+}
+
+/* Shadow follows ball with size/opacity changes based on height */
+@keyframes shadow-follow {
+    0% {
+        left: 20px;
+        bottom: -2px;
+        width: 30px;
+        height: 6px;
+        opacity: 0.4;
+    }
+    10% {
+        left: 76px;
+        bottom: -2px;
+        width: 20px;
+        height: 4px;
+        opacity: 0.25;
+    }
+    20% {
+        left: 132px;
+        bottom: -2px;
+        width: 14px;
+        height: 3px;
+        opacity: 0.18;
+    }
+    25% {
+        left: 160px;
+        bottom: -2px;
+        width: 12px;
+        height: 3px;
+        opacity: 0.15;
+    }
+    30% {
+        left: 188px;
+        bottom: -2px;
+        width: 14px;
+        height: 3px;
+        opacity: 0.18;
+    }
+    40% {
+        left: 244px;
+        bottom: -2px;
+        width: 20px;
+        height: 4px;
+        opacity: 0.25;
+    }
+    50% {
+        left: 251px;
+        bottom: -2px;
+        width: 30px;
+        height: 6px;
+        opacity: 0.4;
+    }
+    54% {
+        left: 244px;
+        bottom: -2px;
+        width: 25px;
+        height: 5px;
+        opacity: 0.3;
+    }
+    60% {
+        left: 223px;
+        bottom: -2px;
+        width: 27px;
+        height: 6px;
+        opacity: 0.35;
+    }
+    70% {
+        left: 167px;
+        bottom: -2px;
+        width: 16px;
+        height: 4px;
+        opacity: 0.2;
+    }
+    80% {
+        left: 111px;
+        bottom: -2px;
+        width: 14px;
+        height: 3px;
+        opacity: 0.18;
+    }
+    90% {
+        left: 55px;
+        bottom: -2px;
+        width: 20px;
+        height: 4px;
+        opacity: 0.25;
+    }
+    100% {
+        left: 20px;
+        bottom: -2px;
+        width: 30px;
+        height: 6px;
+        opacity: 0.4;
+    }
+}
+
+@keyframes fade-pulse {
+    0%, 100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
 }
 
 .cup-standings-container {
@@ -1022,6 +1302,7 @@ h2::after {
     margin-bottom: 2rem;
     border-bottom: 2px solid var(--border);
     overflow-x: auto;
+    align-items: center;
 }
 
 .subtab-btn {
@@ -1047,6 +1328,28 @@ h2::after {
     border-bottom-color: var(--primary-color);
 }
 
+/* Refresh button in league subtabs */
+#refresh-league-btn {
+    margin-left: auto;
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    background: var(--background-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#refresh-league-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    transform: rotate(180deg);
+}
+
+#refresh-league-btn:active {
+    transform: rotate(180deg) scale(0.95);
+}
+
 /* League pages */
 .league-page {
     display: none;
@@ -1056,6 +1359,111 @@ h2::after {
 .league-page.active {
     display: block;
 }
+
+/* League standings table */
+.league-table-wrapper {
+    background: var(--background);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px var(--shadow);
+    border: 1px solid var(--border);
+    margin-top: 1rem;
+}
+
+.league-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.league-table thead {
+    background: var(--secondary-color);
+    color: white;
+}
+
+.league-table th,
+.league-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.league-table th {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+.league-table tbody tr:hover {
+    background-color: rgba(0, 255, 135, 0.1);
+}
+
+.league-table .rank {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: var(--secondary-color);
+    text-align: center;
+    width: 60px;
+}
+
+.league-table .manager-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.league-table .team-name {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.league-table .league-points {
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    text-align: center;
+}
+
+.league-table .total-points {
+    font-weight: 600;
+    color: var(--secondary-color);
+    text-align: center;
+}
+
+.league-table .wins,
+.league-table .draws,
+.league-table .losses {
+    text-align: center;
+    font-weight: 500;
+}
+
+.league-table .wins {
+    color: #10b981;
+}
+
+.league-table .draws {
+    color: var(--text-secondary);
+}
+
+.league-table .losses {
+    color: #ef4444;
+}
+
+/* League position styling */
+.league-table tbody tr:nth-child(1) {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+    border-left: 4px solid #ffd700;
+}
+
+.league-table tbody tr:nth-child(2) {
+    background: linear-gradient(90deg, rgba(192, 192, 192, 0.1) 0%, transparent 100%);
+    border-left: 4px solid #c0c0c0;
+}
+
+.league-table tbody tr:nth-child(3) {
+    background: linear-gradient(90deg, rgba(205, 127, 50, 0.1) 0%, transparent 100%);
+    border-left: 4px solid #cd7f32;
+}
+
 
 /* Stat cards for overview page */
 .stat-cards {
@@ -1181,6 +1589,133 @@ h2::after {
 .match-info p {
     color: var(--text-secondary);
     font-size: 0.85rem;
+}
+
+/* Matches page filters */
+.matches-filters {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--background-alt);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.filter-select {
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--background);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-select:hover {
+    border-color: var(--primary-color);
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 255, 135, 0.1);
+}
+
+/* Matches display */
+.matches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.gameweek-section h4 {
+    color: var(--secondary-color);
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.matches-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.match-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--background-alt);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.match-entry .team-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.match-entry .points {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--secondary-color);
+}
+
+.match-entry.winner {
+    background: rgba(0, 255, 135, 0.1);
+    border: 2px solid var(--primary-color);
+}
+
+.match-entry.winner .team-name {
+    color: var(--primary-color);
+}
+
+.match-entry.winner .points {
+    color: var(--primary-color);
+}
+
+.match-entry.highlighted {
+    background: rgba(233, 0, 82, 0.1);
+    border: 2px solid var(--accent-color);
+    box-shadow: 0 0 10px rgba(233, 0, 82, 0.2);
+}
+
+.match-vs {
+    text-align: center;
+    color: var(--text-secondary);
+    font-weight: 600;
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.no-matches {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+.no-matches p {
+    font-size: 1.1rem;
 }
 
 /* Loading and error states for League */
@@ -1402,6 +1937,15 @@ h2::after {
         font-size: 1rem;
     }
     
+    .league-table {
+        font-size: 0.85rem;
+    }
+    
+    .league-table th,
+    .league-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
     .match-cards {
         grid-template-columns: 1fr;
     }
@@ -1432,6 +1976,19 @@ h2::after {
     }
     
     .transfer-summary {
+        grid-template-columns: 1fr;
+    }
+    
+    .matches-filters {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .filter-group {
+        min-width: 100%;
+    }
+    
+    .matches-grid {
         grid-template-columns: 1fr;
     }
 }

@@ -86,9 +86,43 @@ export interface H2HMatchesResponse {
     results: H2HMatch[];
 }
 
+// H2H Standings response (faster, single API call)
+export interface H2HStandingEntry {
+    id: number;
+    division: number;
+    entry: number;
+    player_name: string;
+    rank: number;
+    last_rank: number;
+    rank_sort: number;
+    total: number; // League points (W=3, D=1, L=0)
+    entry_name: string;
+    matches_played: number;
+    matches_won: number;
+    matches_drawn: number;
+    matches_lost: number;
+    points_for: number; // Total FPL points
+}
+
+export interface H2HStandingsResponse {
+    standings: {
+        has_next: boolean;
+        page: number;
+        results: H2HStandingEntry[];
+    };
+    league: FPLLeague;
+    new_entries?: {
+        has_next: boolean;
+        page: number;
+        results: any[];
+    };
+    last_updated_data?: string | null;
+}
+
 export interface LeagueDataModel {
-    matches: H2HMatch[];
-    totalMatches: number;
+    matches?: H2HMatch[]; // Optional - lazy loaded
+    standings?: H2HStandingEntry[]; // Optional - from standings endpoint
+    totalMatches?: number;
     lastUpdated: Date;
     viewModels?: import('./viewModels.js').LeagueViewModels;
 }

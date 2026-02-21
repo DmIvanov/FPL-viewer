@@ -8,9 +8,18 @@ The project has been refactored following a clean, modular architecture with cle
 src/
 ├── script.ts      # Main entry point & orchestration
 ├── types.ts       # TypeScript type definitions
-├── api.ts         # Network layer (API calls)
+├── api.ts         # Network layer (API calls & local cache)
 ├── ui.ts          # UI manipulation & DOM interactions
 └── utils.ts       # Utility functions (debounce, etc.)
+
+data/
+└── cache/         # Local cache for static H2H match pages
+    ├── h2h-matches-page-1.json
+    ├── h2h-matches-page-2.json
+    └── h2h-matches-page-3.json
+
+scripts/
+└── refresh-cache.sh  # Script to update cached pages
 ```
 
 ## 🏗️ Architecture Layers
@@ -23,9 +32,14 @@ src/
 ### 2. **API Layer** (`api.ts`)
 - Handles all network requests and data fetching
 - Pure networking logic with zero UI dependencies
+- **Local Cache Optimization**: Loads static match pages from local files
 - Functions:
   - `fetchRealFPLData()`: Fetches live FPL data using CORS proxies
+  - `fetchH2HStandings()`: Fast single-call H2H standings endpoint
+  - `fetchH2HMatches()`: Loads matches with local cache + API fallback
+  - `loadCachedPage()`: Loads static pages from local cache
 - **Purpose**: Separation of data fetching from business logic
+- **Performance**: Pages 1-3 cached locally (instant), page 4+ from API
 
 ### 3. **UI Layer** (`ui.ts`)
 - All DOM manipulation and UI rendering logic
@@ -84,6 +98,34 @@ DOM Updates
 4. **Reusability**: Functions can be imported and reused across modules
 5. **Type Safety**: Centralized type definitions ensure consistency
 6. **Scalability**: Easy to add new features to specific layers
+7. **Performance**: Multi-level caching and lazy loading strategies
+
+## ⚡ Performance Optimizations
+
+### 1. **Local Cache for Static Data**
+- **Problem**: Finished match pages don't change but require slow proxy calls (15s each)
+- **Solution**: Cache static pages locally as JSON files
+- **Implementation**: `data/cache/h2h-matches-page-*.json`
+- **Impact**: Pages 1-3 load instantly (<0.1s vs 45s through proxies)
+
+### 2. **Lazy Loading Strategy**
+- **Standings Tab**: Single fast API call (`/leagues-h2h/{id}/standings/`)
+- **Matches/Charts Tabs**: Only loaded when user clicks (on-demand)
+- **Impact**: Initial page load ~1 second instead of 30+ seconds
+
+### 3. **Multi-Level Caching**
+- **Level 1**: Memory cache (5 minutes)
+- **Level 2**: Local static files (permanent for finished gameweeks)
+- **Level 3**: API with CORS proxies (fallback)
+
+### 4. **Smart API Usage**
+- **Before**: 10+ paginated calls for complete data
+- **After**: 
+  - Standings: 1 API call
+  - Matches: 3 local files + only new pages from API
+- **Savings**: ~90% reduction in API calls
+
+See [CACHE_OPTIMIZATION.md](CACHE_OPTIMIZATION.md) for details on managing the cache.
 
 ## 🔧 Module Dependencies
 

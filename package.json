@@ -4,11 +4,12 @@
   "description": "Fantasy Premier League analytics dashboard for Friends Premier League Cup",
   "main": "index.html",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp index.html dist/ && cp -r css dist/ && cp -r data dist/ && (cp -r images dist/ 2>/dev/null || true)",
     "build:watch": "tsc --watch",
     "start": "npm run build && npx http-server dist -p 3000 -o",
     "dev": "npm run build:watch & npx http-server dist -p 3000",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "refresh-cache": "./scripts/refresh-cache.sh"
   },
   "keywords": [
     "fantasy-premier-league",

@@ -1,22 +1,50 @@
 // ===== API & NETWORKING LAYER =====
 
-import type { FPLLeagueStandings, H2HMatchesResponse, H2HMatch, LeagueDataModel } from './types.js';
+import type { FPLLeagueStandings, H2HMatchesResponse, H2HMatch, H2HStandingsResponse, LeagueDataModel } from './types.js';
 
 const FPL_API_URL = 'https://fantasy.premierleague.com/api/leagues-classic/841567/standings/';
 const H2H_LEAGUE_ID = 154959;
 const H2H_API_BASE_URL = `https://fantasy.premierleague.com/api/leagues-h2h-matches/league/${H2H_LEAGUE_ID}`;
+const H2H_STANDINGS_URL = `https://fantasy.premierleague.com/api/leagues-h2h/${H2H_LEAGUE_ID}/standings/`;
+
+// Configuration for cached static pages
+const CACHED_PAGES_COUNT = 3; // Number of pages we have cached locally
+const CACHED_PAGES_BASE_URL = '../data/cache/h2h-matches-page-'; // Relative to dist/
 
 const CORS_PROXIES = [
-    'https://api.allorigins.win/get?url=',
-    'https://corsproxy.io/?',
-    'https://api.codetabs.com/v1/proxy?quest='
+    'https://corsproxy.io/?', // Fast but may have rate limits
+    'https://api.codetabs.com/v1/proxy?quest=',
+    'https://api.allorigins.win/get?url=' // Slowest - use as fallback
 ];
 
 // Cache for API responses
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-let cachedLeagueData: { data: LeagueDataModel; timestamp: number } | null = null;
+let cachedStandingsData: { data: LeagueDataModel; timestamp: number } | null = null;
+let cachedMatchesData: { data: LeagueDataModel; timestamp: number } | null = null;
 let workingProxyIndex: number = 0; // Remember which proxy works
 let directAccessWorks: boolean | null = null; // Track if direct access works (null = not tested yet)
+
+/**
+ * Loads a cached H2H matches page from local storage
+ */
+async function loadCachedPage(pageNumber: number): Promise<H2HMatchesResponse | null> {
+    if (pageNumber > CACHED_PAGES_COUNT) {
+        return null; // Page not cached
+    }
+    
+    try {
+        const response = await fetch(`${CACHED_PAGES_BASE_URL}${pageNumber}.json`);
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`📦 Loaded page ${pageNumber} from cache (${data.results?.length || 0} matches)`);
+            return data as H2HMatchesResponse;
+        }
+    } catch (error) {
+        console.warn(`⚠️ Failed to load cached page ${pageNumber}:`, error);
+    }
+    
+    return null;
+}
 
 /**
  * Fetches real FPL data from the Fantasy Premier League API
@@ -124,8 +152,16 @@ export async function fetchRealFPLData(): Promise<FPLLeagueStandings> {
 
 /**
  * Fetches a single page of H2H matches
+ * Checks local cache first for static pages, then falls back to API
  */
 async function fetchH2HPage(pageNumber: number): Promise<H2HMatchesResponse> {
+    // Try loading from cache first (for static finished pages)
+    const cachedData = await loadCachedPage(pageNumber);
+    if (cachedData) {
+        return cachedData;
+    }
+    
+    // Not in cache, fetch from API
     const pageUrl = `${H2H_API_BASE_URL}?page=${pageNumber}`;
     
     // Try direct access first if we know it works or haven't tested it yet
@@ -212,38 +248,168 @@ async function fetchH2HPage(pageNumber: number): Promise<H2HMatchesResponse> {
 }
 
 /**
- * Fetches all H2H matches with parallel pagination and caching
+ * Fetches H2H standings (fast, single API call)
+ * Returns league standings with win/draw/loss records
+ */
+export async function fetchH2HStandings(): Promise<LeagueDataModel> {
+    // Check cache first
+    if (cachedStandingsData && (Date.now() - cachedStandingsData.timestamp) < CACHE_DURATION) {
+        console.log('✨ Using cached H2H standings data');
+        return cachedStandingsData.data;
+    }
+    
+    console.log('🔍 Fetching H2H standings (single API call)...');
+    
+    // Try direct access first
+    if (directAccessWorks !== false) {
+        try {
+            const response = await fetch(H2H_STANDINGS_URL, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            if (response.ok) {
+                const data: H2HStandingsResponse = await response.json();
+                if (data && data.standings && Array.isArray(data.standings.results)) {
+                    if (directAccessWorks === null) {
+                        console.log('✅ Direct API access works! Using direct calls.');
+                        directAccessWorks = true;
+                    }
+                    
+                    const result: LeagueDataModel = {
+                        standings: data.standings.results,
+                        lastUpdated: new Date()
+                    };
+                    
+                    // Cache the result
+                    cachedStandingsData = {
+                        data: result,
+                        timestamp: Date.now()
+                    };
+                    
+                    console.log(`✅ Successfully loaded ${data.standings.results.length} managers from H2H standings`);
+                    return result;
+                }
+            }
+        } catch (error) {
+            if (directAccessWorks === null) {
+                console.log('⚠️ Direct API access blocked, using proxies...');
+                directAccessWorks = false;
+            }
+        }
+    }
+    
+    // Try with proxies
+    const proxyOrder = [
+        ...CORS_PROXIES.slice(workingProxyIndex),
+        ...CORS_PROXIES.slice(0, workingProxyIndex)
+    ];
+    
+    for (let i = 0; i < proxyOrder.length; i++) {
+        const proxyUrl = proxyOrder[i];
+        if (!proxyUrl) continue;
+        
+        try {
+            let fetchUrl: string;
+            let processResponse: (response: Response) => Promise<any>;
+            
+            if (proxyUrl.includes('allorigins')) {
+                fetchUrl = `${proxyUrl}${encodeURIComponent(H2H_STANDINGS_URL)}`;
+                processResponse = async (response: Response) => {
+                    const data = await response.json();
+                    return JSON.parse(data.contents);
+                };
+            } else {
+                fetchUrl = `${proxyUrl}${H2H_STANDINGS_URL}`;
+                processResponse = async (response: Response) => {
+                    return await response.json();
+                };
+            }
+            
+            const response = await fetch(fetchUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data: H2HStandingsResponse = await processResponse(response);
+            
+            if (data && data.standings && Array.isArray(data.standings.results)) {
+                workingProxyIndex = CORS_PROXIES.indexOf(proxyUrl);
+                
+                const result: LeagueDataModel = {
+                    standings: data.standings.results,
+                    lastUpdated: new Date()
+                };
+                
+                // Cache the result
+                cachedStandingsData = {
+                    data: result,
+                    timestamp: Date.now()
+                };
+                
+                console.log(`✅ Successfully loaded ${data.standings.results.length} managers from H2H standings`);
+                return result;
+            } else {
+                throw new Error('Invalid response structure');
+            }
+            
+        } catch (error) {
+            if (i === proxyOrder.length - 1) {
+                throw new Error('All proxies failed for H2H standings');
+            }
+        }
+    }
+    
+    throw new Error('Failed to fetch H2H standings');
+}
+
+/**
+ * Fetches all H2H matches with parallel pagination and local caching
+ * - Pages 1-3: Loaded from local cache (static/finished gameweeks)
+ * - Page 4+: Fetched from API (recent/ongoing gameweeks)
  * Supports progressive callback for updating UI as data arrives
  */
 export async function fetchH2HMatches(
     onProgress?: (matches: H2HMatch[], isComplete: boolean) => void
 ): Promise<LeagueDataModel> {
-    // Check cache first
-    if (cachedLeagueData && (Date.now() - cachedLeagueData.timestamp) < CACHE_DURATION) {
-        console.log('✨ Using cached League data');
+    // Check memory cache first
+    if (cachedMatchesData && (Date.now() - cachedMatchesData.timestamp) < CACHE_DURATION) {
+        console.log('✨ Using cached H2H matches data from memory');
         if (onProgress) {
-            onProgress(cachedLeagueData.data.matches, true);
+            onProgress(cachedMatchesData.data.matches!, true);
         }
-        return cachedLeagueData.data;
+        return cachedMatchesData.data;
     }
     
-    console.log('🔍 Fetching H2H League matches with parallel pagination...');
+    console.log(`🔍 Fetching H2H League matches (pages 1-${CACHED_PAGES_COUNT} from local cache, rest from API)...`);
     
     const allMatches: H2HMatch[] = [];
     
-    // First, fetch page 1 to determine total pages
-    const firstPage = await fetchH2HPage(1);
-    allMatches.push(...firstPage.results);
-    console.log(`✅ Page 1: Found ${firstPage.results.length} matches`);
+    // Load cached pages first (pages 1-3)
+    console.log(`📦 Loading ${CACHED_PAGES_COUNT} cached pages...`);
+    for (let pageNum = 1; pageNum <= CACHED_PAGES_COUNT; pageNum++) {
+        const pageData = await fetchH2HPage(pageNum);
+        allMatches.push(...pageData.results);
+    }
+    console.log(`✅ Loaded ${allMatches.length} matches from ${CACHED_PAGES_COUNT} cached pages`);
     
-    // Notify progress
+    // Check if there are more pages beyond cached ones
+    const lastCachedPage = await fetchH2HPage(CACHED_PAGES_COUNT);
+    
+    // Notify progress after cached pages
     if (onProgress) {
-        onProgress([...allMatches], !firstPage.has_next);
+        onProgress([...allMatches], !lastCachedPage.has_next);
     }
     
-    // If there are more pages, fetch them in parallel (batches of 3)
-    if (firstPage.has_next) {
-        let currentPage = 2;
+    // If there are more pages, fetch them from API (starting at page 4)
+    if (lastCachedPage.has_next) {
+        console.log(`🌐 Fetching remaining pages from API (starting at page ${CACHED_PAGES_COUNT + 1})...`);
+        
+        let currentPage = CACHED_PAGES_COUNT + 1; // Start from page 4
         let hasNext = true;
         const BATCH_SIZE = 3; // Fetch 3 pages at a time to avoid overwhelming the API
         
@@ -307,7 +473,7 @@ export async function fetchH2HMatches(
     };
     
     // Cache the result
-    cachedLeagueData = {
+    cachedMatchesData = {
         data: result,
         timestamp: Date.now()
     };
@@ -319,7 +485,8 @@ export async function fetchH2HMatches(
  * Clears the cached league data (useful for manual refresh)
  */
 export function clearLeagueCache(): void {
-    cachedLeagueData = null;
+    cachedStandingsData = null;
+    cachedMatchesData = null;
     directAccessWorks = null; // Re-test direct access on next request
     console.log('🗑️ League cache cleared');
 }

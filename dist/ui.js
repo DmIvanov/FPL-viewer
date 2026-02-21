@@ -284,9 +284,11 @@ export function hideLeagueLoadingState() {
     }
 }
 /**
- * Sets up League subtab switching
+ * Sets up League subtab switching with lazy loading support
+ * @param leagueData Initial league data (may only contain standings)
+ * @param loadMatchesCallback Optional callback to load matches data when needed
  */
-export function setupLeagueSubtabs(leagueData) {
+export function setupLeagueSubtabs(leagueData, loadMatchesCallback) {
     const subtabButtons = document.querySelectorAll('.subtab-btn');
     const leaguePages = document.querySelectorAll('.league-page');
     // Populate initial active page
@@ -294,14 +296,24 @@ export function setupLeagueSubtabs(leagueData) {
     if (activeButton && leagueData) {
         const initialPage = activeButton.getAttribute('data-page');
         if (initialPage) {
-            populateLeaguePage(initialPage, leagueData);
+            // Use setTimeout to ensure DOM is ready and await the async operation
+            setTimeout(() => {
+                populateLeaguePage(initialPage, leagueData, loadMatchesCallback);
+            }, 0);
         }
     }
+    // Remove old event listeners by cloning and replacing nodes
     subtabButtons.forEach((button) => {
-        button.addEventListener('click', () => {
+        const newButton = button.cloneNode(true);
+        button.parentNode?.replaceChild(newButton, button);
+    });
+    // Get updated button references after cloning
+    const updatedSubtabButtons = document.querySelectorAll('.subtab-btn');
+    updatedSubtabButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
             const targetPage = button.getAttribute('data-page');
             // Update active button
-            subtabButtons.forEach((btn) => {
+            updatedSubtabButtons.forEach((btn) => {
                 btn.classList.remove('active');
             });
             button.classList.add('active');
@@ -314,7 +326,7 @@ export function setupLeagueSubtabs(leagueData) {
                 targetPageElement.classList.add('active');
                 // Populate page content if data is available
                 if (leagueData) {
-                    populateLeaguePage(targetPage, leagueData);
+                    await populateLeaguePage(targetPage, leagueData, loadMatchesCallback);
                 }
             }
             console.log(`📄 Switched to League subtab: ${targetPage}`);
@@ -322,9 +334,9 @@ export function setupLeagueSubtabs(leagueData) {
     });
 }
 /**
- * Populates content for a specific League page
+ * Populates content for a specific League page with lazy loading support
  */
-function populateLeaguePage(pageName, data) {
+async function populateLeaguePage(pageName, data, loadMatchesCallback) {
     if (!pageName)
         return;
     console.log(`📄 Populating page: ${pageName}`);
@@ -333,15 +345,48 @@ function populateLeaguePage(pageName, data) {
         console.error(`❌ Content element not found: ${pageName}-content`);
         return;
     }
+    // Check if page requires matches data
+    const requiresMatches = pageName === 'matches' || pageName === 'statistics';
+    const hasMatches = data.viewModels?.matches && data.viewModels?.charts;
+    // If page requires matches but they're not loaded yet, trigger lazy load
+    if (requiresMatches && !hasMatches && loadMatchesCallback) {
+        console.log(`📊 ${pageName} requires matches data, loading...`);
+        // Show loading state
+        contentElement.innerHTML = '<div class="loading-indicator active">Loading data...</div>';
+        try {
+            const updatedData = await loadMatchesCallback();
+            if (updatedData) {
+                // Data was loaded, continue with population
+                data = updatedData;
+            }
+            else {
+                // Failed to load, error message already shown by callback
+                return;
+            }
+        }
+        catch (error) {
+            console.error('Failed to load matches:', error);
+            contentElement.innerHTML = `
+                <div class="error-message">
+                    <p>Failed to load detailed data.</p>
+                </div>
+            `;
+            return;
+        }
+    }
     switch (pageName) {
         case 'standings':
             populateStandingsPage(contentElement, data);
             break;
         case 'matches':
-            populateMatchesPage(contentElement, data);
+            if (data.viewModels?.matches) {
+                populateMatchesPage(contentElement, data);
+            }
             break;
         case 'statistics':
-            populateStatisticsPage(contentElement, data);
+            if (data.viewModels?.charts) {
+                populateStatisticsPage(contentElement, data);
+            }
             break;
         case 'history':
             populateHistoryPage(contentElement, data);
@@ -415,8 +460,9 @@ function populateMatchesPage(element, data) {
         loadingIndicator.classList.remove('active');
     }
     // Use pre-built matches view model
-    if (!data.viewModels) {
+    if (!data.viewModels || !data.viewModels.matches) {
         console.error('❌ No view models available for matches');
+        element.innerHTML = '<div class="error-message"><p>Matches data not available</p></div>';
         return;
     }
     const matchViewModels = data.viewModels.matches;
@@ -429,10 +475,33 @@ function populateMatchesPage(element, data) {
     const managers = Array.from(managersSet).sort();
     // Get all gameweeks sorted descending
     const gameweeks = Array.from(new Set(matchViewModels.map(m => m.gameWeek))).sort((a, b) => b - a);
-    // Find last gameweek with played matches
-    const currentGameweek = matchViewModels
-        .filter(m => m.result !== 'pending')
-        .reduce((max, match) => Math.max(max, match.gameWeek), 0);
+    // Find the highest consecutive finished gameweek (not just max finished gameweek)
+    // Strategy: Find the highest gameweek that has any pending matches, then use the one before
+    // This handles cases where we have previous season data (GW 1-38 all finished) mixed with current season
+    const gameweeksWithPending = new Set(matchViewModels
+        .filter(m => m.result === 'pending')
+        .map(m => m.gameWeek));
+    let currentGameweek = 0;
+    if (gameweeksWithPending.size > 0) {
+        // Find the lowest gameweek with pending matches, then use the one before it
+        const lowestPending = Math.min(...Array.from(gameweeksWithPending));
+        currentGameweek = lowestPending > 1 ? lowestPending - 1 : 1;
+    }
+    else {
+        // All matches finished - find highest consecutive from GW1
+        const finishedGameweeks = new Set(matchViewModels
+            .filter(m => m.result !== 'pending')
+            .map(m => m.gameWeek));
+        const sortedGameweeks = Array.from(new Set(matchViewModels.map(m => m.gameWeek))).sort((a, b) => a - b);
+        for (const gw of sortedGameweeks) {
+            if (finishedGameweeks.has(gw)) {
+                currentGameweek = gw;
+            }
+            else {
+                break;
+            }
+        }
+    }
     // If no played matches found, use the latest gameweek
     const defaultGameweek = currentGameweek > 0 ? currentGameweek : (gameweeks[0] || 1);
     // Create filter UI
@@ -605,8 +674,9 @@ function populateStatisticsPage(element, data) {
             }
             console.log('✅ Chart.js loaded, using pre-built chart data...');
             // Use pre-built chart data from view models
-            if (!data.viewModels) {
+            if (!data.viewModels || !data.viewModels.charts) {
                 console.error('❌ No view models available for charts');
+                element.innerHTML = '<div class="error-message"><p>Chart data not available</p></div>';
                 return;
             }
             const chartData = data.viewModels.charts;

@@ -6,6 +6,7 @@
     <title>Friends Premier League - FPL Analytics</title>
     <meta name="description" content="Fantasy Premier League analytics and statistics for our friends league. Charts, tables, and insights powered by TypeScript.">
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Header Section -->
@@ -16,7 +17,7 @@
             </div>
             <ul class="nav-menu">
                 <li class="nav-item">
-                    <a href="#charts" class="nav-link">Charts</a>
+                    <a href="#league" class="nav-link">League</a>
                 </li>
                 <li class="nav-item">
                     <a href="#cup" class="nav-link">Cup</a>
@@ -32,15 +33,65 @@
 
     <!-- Main Content -->
     <main class="main">
-        <!-- Charts Section -->
-        <section id="charts" class="charts">
+        <!-- League Section -->
+        <section id="league" class="league tab-section active">
             <div class="container">
-                <!-- Content will be added here -->
+                <h2>Friends Premier League</h2>
+                
+                <!-- Subtabs Navigation -->
+                <div class="league-subtabs">
+                    <button class="subtab-btn active" data-page="standings">Standings</button>
+                    <button class="subtab-btn" data-page="matches">Matches</button>
+                    <button class="subtab-btn" data-page="statistics">Charts</button>
+                    <button class="subtab-btn" data-page="history">History</button>
+                    <button id="refresh-league-btn" class="btn-secondary" title="Refresh league data">🔄</button>
+                </div>
+                
+                <!-- League Pages -->
+                <div class="league-pages">
+                    <!-- Standings Page -->
+                    <div id="league-standings" class="league-page active">
+                        <h3>League Standings</h3>
+                        <div id="standings-content" class="page-content">
+                            <div class="loading-indicator active" id="league-loading">
+                                <div class="football-field">
+                                    <img src="images/soccer-icon-614x460.png" alt="Football" class="football">
+                                    <div class="shadow"></div>
+                                </div>
+                                <p class="loading-text">Counting goals and calculating glory...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Matches Page -->
+                    <div id="league-matches" class="league-page">
+                        <h3>Match Results</h3>
+                        <div id="matches-content" class="page-content">
+                            <!-- Matches content will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Charts Page -->
+                    <div id="league-statistics" class="league-page">
+                        <h3>League Charts</h3>
+                        <div id="statistics-content" class="page-content">
+                            <!-- Chart content will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <!-- History Page -->
+                    <div id="league-history" class="league-page">
+                        <h3>Historical Data</h3>
+                        <div id="history-content" class="page-content">
+                            <!-- History content will be populated here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
         <!-- Cup Section -->
-        <section id="cup" class="cup">
+        <section id="cup" class="cup tab-section">
             <div class="container">
                 <h2>FPL Cup Standings</h2>
                 <div class="loading-indicator" id="cup-loading" style="display: none;">
@@ -77,6 +128,6 @@
         </section>
     </main>
 
-    <script src="script.js"></script>
+    <script type="module" src="script.js?v=18"></script>
 </body>
 </html>
