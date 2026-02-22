@@ -554,6 +554,104 @@ function populateMatchesPage(element, data) {
     }
 }
 /**
+ * Enriches matches with captain and chip data
+ */
+async function enrichMatchesWithCaptainChip(matches) {
+    const { fetchMatchCaptainAndChip } = await import('./api.js');
+    console.log(`📊 Enriching ${matches.length} matches with captain/chip data...`);
+    // Fetch data for all matches in parallel (but limit concurrency to avoid overwhelming API)
+    const batchSize = 3;
+    for (let i = 0; i < matches.length; i += batchSize) {
+        const batch = matches.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (match) => {
+            try {
+                const data = await fetchMatchCaptainAndChip(match.manager1Entry, match.manager2Entry, match.gameWeek);
+                if (data) {
+                    match.manager1Captain = data.manager1Captain;
+                    match.manager1Chip = data.manager1Chip;
+                    match.manager2Captain = data.manager2Captain;
+                    match.manager2Chip = data.manager2Chip;
+                    // Update the DOM for this specific match
+                    updateMatchCardDisplay(match);
+                }
+            }
+            catch (error) {
+                console.error(`Failed to enrich match (GW${match.gameWeek}):`, error);
+            }
+        }));
+    }
+    console.log('✅ Finished enriching matches');
+}
+/**
+ * Updates a single match card in the DOM with captain/chip info
+ */
+function updateMatchCardDisplay(match) {
+    const matchCards = document.querySelectorAll('.match-card');
+    matchCards.forEach((card) => {
+        const cardGameweek = parseInt(card.getAttribute('data-gameweek') || '0');
+        const cardM1Entry = parseInt(card.getAttribute('data-m1-entry') || '0');
+        const cardM2Entry = parseInt(card.getAttribute('data-m2-entry') || '0');
+        if (cardGameweek === match.gameWeek &&
+            cardM1Entry === match.manager1Entry &&
+            cardM2Entry === match.manager2Entry) {
+            // Find the team-info divs and add captain/chip data
+            const entries = card.querySelectorAll('.match-entry');
+            if (entries.length >= 2) {
+                // Manager 1
+                const entry1 = entries[0];
+                if (entry1) {
+                    const entry1TeamInfo = entry1.querySelector('.team-info');
+                    if (entry1TeamInfo) {
+                        let metaHtml = '';
+                        if (match.manager1Captain || match.manager1Chip) {
+                            metaHtml = '<span class="team-meta">';
+                            if (match.manager1Captain) {
+                                metaHtml += `<span class="captain-info">⚽ ${escapeHtml(match.manager1Captain)}</span>`;
+                            }
+                            if (match.manager1Chip) {
+                                metaHtml += `<span class="chip-info">🎴 ${escapeHtml(match.manager1Chip)}</span>`;
+                            }
+                            metaHtml += '</span>';
+                        }
+                        const existingMeta = entry1TeamInfo.querySelector('.team-meta');
+                        if (existingMeta) {
+                            existingMeta.remove();
+                        }
+                        if (metaHtml) {
+                            entry1TeamInfo.insertAdjacentHTML('beforeend', metaHtml);
+                        }
+                    }
+                }
+                // Manager 2
+                const entry2 = entries[1];
+                if (entry2) {
+                    const entry2TeamInfo = entry2.querySelector('.team-info');
+                    if (entry2TeamInfo) {
+                        let metaHtml = '';
+                        if (match.manager2Captain || match.manager2Chip) {
+                            metaHtml = '<span class="team-meta">';
+                            if (match.manager2Captain) {
+                                metaHtml += `<span class="captain-info">⚽ ${escapeHtml(match.manager2Captain)}</span>`;
+                            }
+                            if (match.manager2Chip) {
+                                metaHtml += `<span class="chip-info">🎴 ${escapeHtml(match.manager2Chip)}</span>`;
+                            }
+                            metaHtml += '</span>';
+                        }
+                        const existingMeta = entry2TeamInfo.querySelector('.team-meta');
+                        if (existingMeta) {
+                            existingMeta.remove();
+                        }
+                        if (metaHtml) {
+                            entry2TeamInfo.insertAdjacentHTML('beforeend', metaHtml);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+/**
  * Renders matches based on filter criteria
  */
 function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
@@ -617,12 +715,28 @@ function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
                 html += `
                     <div class="match-card clickable" ${matchDataAttrs}>
                         <div class="match-entry ${entry1Class} ${isEntry1Highlighted ? 'highlighted' : ''}">
-                            <span class="team-name">${escapeHtml(match.manager1TeamName)}</span>
+                            <div class="team-info">
+                                <span class="team-name">${escapeHtml(match.manager1TeamName)}</span>
+                                ${match.manager1Captain || match.manager1Chip ? `
+                                    <span class="team-meta">
+                                        ${match.manager1Captain ? `<span class="captain-info">⚽ ${escapeHtml(match.manager1Captain)}</span>` : ''}
+                                        ${match.manager1Chip ? `<span class="chip-info">🎴 ${escapeHtml(match.manager1Chip)}</span>` : ''}
+                                    </span>
+                                ` : ''}
+                            </div>
                             <span class="points">${match.manager1Points}</span>
                         </div>
                         <div class="match-vs">vs</div>
                         <div class="match-entry ${entry2Class} ${isEntry2Highlighted ? 'highlighted' : ''}">
-                            <span class="team-name">${escapeHtml(match.manager2TeamName)}</span>
+                            <div class="team-info">
+                                <span class="team-name">${escapeHtml(match.manager2TeamName)}</span>
+                                ${match.manager2Captain || match.manager2Chip ? `
+                                    <span class="team-meta">
+                                        ${match.manager2Captain ? `<span class="captain-info">⚽ ${escapeHtml(match.manager2Captain)}</span>` : ''}
+                                        ${match.manager2Chip ? `<span class="chip-info">🎴 ${escapeHtml(match.manager2Chip)}</span>` : ''}
+                                    </span>
+                                ` : ''}
+                            </div>
                             <span class="points">${match.manager2Points}</span>
                         </div>
                     </div>
@@ -651,6 +765,13 @@ function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
             await showMatchDetails(m1Entry, m1Name, m1Team, m1Points, m2Entry, m2Name, m2Team, m2Points, gameweek);
         });
     });
+    // Enrich displayed matches with captain/chip data (only if not already enriched)
+    const matchesToEnrich = filteredMatches.filter(m => !m.manager1Captain && !m.manager2Captain);
+    if (matchesToEnrich.length > 0) {
+        enrichMatchesWithCaptainChip(matchesToEnrich).catch(error => {
+            console.error('Failed to enrich matches:', error);
+        });
+    }
 }
 /**
  * Populates Charts page

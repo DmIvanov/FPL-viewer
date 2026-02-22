@@ -577,4 +577,40 @@ export async function fetchMatchDetails(manager1Entry, manager1Name, manager1Tea
         throw error;
     }
 }
+/**
+ * Enriches match data with captain and chip information
+ * Returns an object with captain names and chips for both managers
+ */
+export async function fetchMatchCaptainAndChip(manager1Entry, manager2Entry, gameweek) {
+    try {
+        // Fetch picks for both managers in parallel
+        const [picks1, picks2, bootstrapData] = await Promise.all([
+            fetchManagerPicks(manager1Entry, gameweek),
+            fetchManagerPicks(manager2Entry, gameweek),
+            fetchBootstrapData()
+        ]);
+        // Create player info map
+        const playerInfo = new Map();
+        bootstrapData.elements.forEach((player) => {
+            playerInfo.set(player.id, {
+                web_name: player.web_name
+            });
+        });
+        // Find captains
+        const captain1Pick = picks1.picks.find((p) => p.is_captain);
+        const captain2Pick = picks2.picks.find((p) => p.is_captain);
+        const manager1Captain = captain1Pick ? playerInfo.get(captain1Pick.element)?.web_name || 'Unknown' : 'Unknown';
+        const manager2Captain = captain2Pick ? playerInfo.get(captain2Pick.element)?.web_name || 'Unknown' : 'Unknown';
+        return {
+            manager1Captain,
+            manager1Chip: picks1.active_chip || null,
+            manager2Captain,
+            manager2Chip: picks2.active_chip || null
+        };
+    }
+    catch (error) {
+        console.error(`⚠️ Failed to fetch captain/chip data for match:`, error);
+        return null;
+    }
+}
 //# sourceMappingURL=api.js.map

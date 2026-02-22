@@ -26,10 +26,14 @@ export interface MatchViewModel {
     manager1Name: string;
     manager1TeamName: string;
     manager1Points: number;
+    manager1Captain?: string;
+    manager1Chip?: string | null;
     manager2Entry: number;
     manager2Name: string;
     manager2TeamName: string;
     manager2Points: number;
+    manager2Captain?: string;
+    manager2Chip?: string | null;
     result: 'win1' | 'win2' | 'draw' | 'pending';
 }
 

@@ -1696,15 +1696,40 @@ h2::after {
     min-width: 0;
 }
 
+.match-entry .team-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 0;
+}
+
 .match-entry .team-name {
     font-weight: 500;
     color: var(--text-primary);
-    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0;
-    padding-right: 0.5rem;
+}
+
+.match-entry .team-meta {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.match-entry .captain-info {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.match-entry .chip-info {
+    color: var(--secondary-color);
+    font-weight: 600;
+    background: rgba(55, 0, 179, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
 }
 
 .match-entry .points {
