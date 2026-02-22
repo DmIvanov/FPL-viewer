@@ -1672,6 +1672,17 @@ h2::after {
     border: 1px solid var(--border);
 }
 
+.match-card.clickable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.match-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow);
+    border-color: var(--primary-color);
+}
+
 .match-entry {
     display: flex;
     justify-content: space-between;
@@ -2082,6 +2093,10 @@ h2::after {
     transition: all 0.3s ease;
 }
 
+.top-score-card.clickable {
+    cursor: pointer;
+}
+
 .top-score-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 16px var(--shadow);
@@ -2190,6 +2205,272 @@ h2::after {
     
     .top-score-card .score-header {
         flex-wrap: wrap;
+    }
+}
+
+/* ===== MATCH DETAILS MODAL ===== */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+}
+
+.modal.active {
+    display: block;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    position: relative;
+    max-width: 1200px;
+    max-height: 90vh;
+    margin: 2rem auto;
+    background: var(--background);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow-y: auto;
+    z-index: 10001;
+}
+
+.modal-close {
+    position: sticky;
+    top: 0;
+    right: 0;
+    float: right;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 1rem;
+    line-height: 1;
+    z-index: 10;
+}
+
+.modal-close:hover {
+    color: var(--accent-color);
+}
+
+.modal-body {
+    padding: 0 2rem 2rem 2rem;
+}
+
+.match-details-container {
+    padding: 1rem 0;
+}
+
+.match-title {
+    text-align: center;
+    color: var(--secondary-color);
+    margin-bottom: 1.5rem;
+}
+
+.match-score {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--background-alt);
+    border-radius: 10px;
+}
+
+.match-score .score-team {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.match-score .score-team.winner {
+    color: var(--primary-color);
+}
+
+.match-score .score-team.loser {
+    color: var(--accent-color);
+}
+
+.match-score .score-numbers {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.teams-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.team-section {
+    background: var(--background-alt);
+    border-radius: 10px;
+    padding: 1.5rem;
+    border: 2px solid var(--border);
+}
+
+.team-section.winner {
+    border-color: var(--primary-color);
+    background: rgba(0, 255, 135, 0.05);
+}
+
+.team-section.loser {
+    border-color: var(--accent-color);
+    background: rgba(233, 0, 82, 0.05);
+}
+
+.team-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.team-section.winner .team-header {
+    border-bottom-color: var(--primary-color);
+}
+
+.team-section.loser .team-header {
+    border-bottom-color: var(--accent-color);
+}
+
+.team-header h3 {
+    color: var(--secondary-color);
+    margin: 0;
+}
+
+.team-points {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--secondary-color);
+}
+
+.chip-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: rgba(233, 0, 82, 0.1);
+    border: 2px solid var(--accent-color);
+    border-radius: 20px;
+    color: var(--accent-color);
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.lineup-header {
+    color: var(--text-primary);
+    margin: 1.5rem 0 0.75rem 0;
+    font-size: 1.1rem;
+}
+
+.player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.player-list.bench {
+    opacity: 0.7;
+}
+
+.player-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--background);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.player-card:hover {
+    background: var(--background-alt);
+}
+
+.player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.player-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.player-details {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.player-points {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--secondary-color);
+}
+
+.player-points.positive {
+    color: var(--primary-color);
+}
+
+.player-points.negative {
+    color: var(--accent-color);
+}
+
+.bench-player {
+    opacity: 0.8;
+}
+
+/* Responsive match details */
+@media (max-width: 768px) {
+    .modal-content {
+        margin: 1rem;
+        max-height: 95vh;
+    }
+    
+    .modal-body {
+        padding: 0 1rem 1rem 1rem;
+    }
+    
+    .teams-comparison {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .match-score {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .match-score .score-team {
+        font-size: 1.1rem;
+    }
+    
+    .match-score .score-numbers {
+        font-size: 2rem;
+    }
+    
+    .team-stats-summary {
+        flex-direction: column;
+        gap: 0.5rem;
     }
 }
 

@@ -490,3 +490,187 @@ export function clearLeagueCache(): void {
     directAccessWorks = null; // Re-test direct access on next request
     console.log('🗑️ League cache cleared');
 }
+
+// ===== MATCH DETAILS API FUNCTIONS =====
+
+const FPL_BOOTSTRAP_URL = 'https://fantasy.premierleague.com/api/bootstrap-static/';
+
+/**
+ * Fetches manager's team picks for a specific gameweek
+ */
+export async function fetchManagerPicks(managerId: number, gameweek: number): Promise<any> {
+    const url = `https://fantasy.premierleague.com/api/entry/${managerId}/event/${gameweek}/picks/`;
+    
+    console.log(`🔍 Fetching picks for manager ${managerId} GW${gameweek}...`);
+    
+    // Try direct access first
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            return await response.json();
+        }
+    } catch (error) {
+        console.log('Direct access failed, trying proxy...');
+    }
+    
+    // Try with CORS proxy
+    for (const proxy of CORS_PROXIES) {
+        try {
+            const proxyUrl = proxy.includes('allorigins') 
+                ? `${proxy}${encodeURIComponent(url)}`
+                : `${proxy}${url}`;
+            
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                const data = await response.json();
+                return proxy.includes('allorigins') ? JSON.parse(data.contents) : data;
+            }
+        } catch (error) {
+            continue;
+        }
+    }
+    
+    throw new Error(`Failed to fetch picks for manager ${managerId}`);
+}
+
+/**
+ * Fetches live gameweek data for all players
+ */
+export async function fetchLiveGameweekData(gameweek: number): Promise<any> {
+    const url = `https://fantasy.premierleague.com/api/event/${gameweek}/live/`;
+    
+    console.log(`🔍 Fetching live data for GW${gameweek}...`);
+    
+    // Try direct access first
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            return await response.json();
+        }
+    } catch (error) {
+        console.log('Direct access failed, trying proxy...');
+    }
+    
+    // Try with CORS proxy
+    for (const proxy of CORS_PROXIES) {
+        try {
+            const proxyUrl = proxy.includes('allorigins') 
+                ? `${proxy}${encodeURIComponent(url)}`
+                : `${proxy}${url}`;
+            
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                const data = await response.json();
+                return proxy.includes('allorigins') ? JSON.parse(data.contents) : data;
+            }
+        } catch (error) {
+            continue;
+        }
+    }
+    
+    throw new Error(`Failed to fetch live data for GW${gameweek}`);
+}
+
+/**
+ * Fetches bootstrap-static data (contains all player info)
+ */
+let cachedBootstrapData: any = null;
+
+export async function fetchBootstrapData(): Promise<any> {
+    if (cachedBootstrapData) {
+        console.log('✨ Using cached bootstrap data');
+        return cachedBootstrapData;
+    }
+    
+    console.log('🔍 Fetching bootstrap-static data...');
+    
+    // Try direct access first
+    try {
+        const response = await fetch(FPL_BOOTSTRAP_URL);
+        if (response.ok) {
+            cachedBootstrapData = await response.json();
+            return cachedBootstrapData;
+        }
+    } catch (error) {
+        console.log('Direct access failed, trying proxy...');
+    }
+    
+    // Try with CORS proxy
+    for (const proxy of CORS_PROXIES) {
+        try {
+            const proxyUrl = proxy.includes('allorigins') 
+                ? `${proxy}${encodeURIComponent(FPL_BOOTSTRAP_URL)}`
+                : `${proxy}${FPL_BOOTSTRAP_URL}`;
+            
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                const data = await response.json();
+                cachedBootstrapData = proxy.includes('allorigins') ? JSON.parse(data.contents) : data;
+                return cachedBootstrapData;
+            }
+        } catch (error) {
+            continue;
+        }
+    }
+    
+    throw new Error('Failed to fetch bootstrap data');
+}
+
+/**
+ * Fetches complete match details including picks and live data
+ */
+export async function fetchMatchDetails(
+    manager1Entry: number,
+    manager1Name: string,
+    manager1TeamName: string,
+    manager1Points: number,
+    manager2Entry: number,
+    manager2Name: string,
+    manager2TeamName: string,
+    manager2Points: number,
+    gameweek: number
+): Promise<any> {
+    console.log(`📊 Fetching match details for GW${gameweek}: ${manager1TeamName} vs ${manager2TeamName}`);
+    
+    try {
+        // Fetch all data in parallel
+        const [picks1, picks2, liveData, bootstrapData] = await Promise.all([
+            fetchManagerPicks(manager1Entry, gameweek),
+            fetchManagerPicks(manager2Entry, gameweek),
+            fetchLiveGameweekData(gameweek),
+            fetchBootstrapData()
+        ]);
+        
+        // Create player info map
+        const playerInfo = new Map();
+        bootstrapData.elements.forEach((player: any) => {
+            playerInfo.set(player.id, {
+                id: player.id,
+                web_name: player.web_name,
+                team: player.team,
+                element_type: player.element_type,
+                now_cost: player.now_cost
+            });
+        });
+        
+        return {
+            manager1Entry,
+            manager1Name,
+            manager1TeamName,
+            manager1Picks: picks1,
+            manager1Points,
+            manager2Entry,
+            manager2Name,
+            manager2TeamName,
+            manager2Picks: picks2,
+            manager2Points,
+            gameweek,
+            liveData,
+            playerInfo,
+            teams: bootstrapData.teams
+        };
+    } catch (error) {
+        console.error('❌ Error fetching match details:', error);
+        throw error;
+    }
+}

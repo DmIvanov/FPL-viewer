@@ -160,3 +160,102 @@ export interface ChartData {
 }
 
 export type ChartType = 'absolute' | 'relative';
+
+// ===== MATCH DETAILS TYPES =====
+
+export interface PickElement {
+    element: number;
+    position: number;
+    multiplier: number;
+    is_captain: boolean;
+    is_vice_captain: boolean;
+}
+
+export interface AutomaticSub {
+    entry: number;
+    element_in: number;
+    element_out: number;
+    event: number;
+}
+
+export interface EntryHistory {
+    event: number;
+    points: number;
+    total_points: number;
+    rank: number;
+    rank_sort: number;
+    overall_rank: number;
+    bank: number;
+    value: number;
+    event_transfers: number;
+    event_transfers_cost: number;
+    points_on_bench: number;
+}
+
+export interface ManagerPicks {
+    active_chip: string | null;
+    automatic_subs: AutomaticSub[];
+    entry_history: EntryHistory;
+    picks: PickElement[];
+}
+
+export interface PlayerStats {
+    minutes: number;
+    goals_scored: number;
+    assists: number;
+    clean_sheets: number;
+    goals_conceded: number;
+    own_goals: number;
+    penalties_saved: number;
+    penalties_missed: number;
+    yellow_cards: number;
+    red_cards: number;
+    saves: number;
+    bonus: number;
+    bps: number;
+    influence: string;
+    creativity: string;
+    threat: string;
+    ict_index: string;
+    starts: number;
+    expected_goals: string;
+    expected_assists: string;
+    expected_goal_involvements: string;
+    expected_goals_conceded: string;
+    total_points: number;
+    in_dreamteam: boolean;
+}
+
+export interface LivePlayerElement {
+    id: number;
+    stats: PlayerStats;
+    explain: any[];
+}
+
+export interface LiveGameweekData {
+    elements: LivePlayerElement[];
+}
+
+export interface PlayerInfo {
+    id: number;
+    web_name: string;
+    team: number;
+    element_type: number;
+    now_cost: number;
+}
+
+export interface MatchDetailsData {
+    manager1Entry: number;
+    manager1Name: string;
+    manager1TeamName: string;
+    manager1Picks: ManagerPicks;
+    manager1Points: number;
+    manager2Entry: number;
+    manager2Name: string;
+    manager2TeamName: string;
+    manager2Picks: ManagerPicks;
+    manager2Points: number;
+    gameweek: number;
+    liveData: LiveGameweekData;
+    playerInfo: Map<number, PlayerInfo>;
+}

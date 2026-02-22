@@ -134,9 +134,11 @@ function buildMatchesViewModel(matches) {
         }
         return {
             gameWeek: match.event,
+            manager1Entry: match.entry_1_entry,
             manager1Name: match.entry_1_player_name,
             manager1TeamName: match.entry_1_name,
             manager1Points: match.entry_1_points,
+            manager2Entry: match.entry_2_entry,
             manager2Name: match.entry_2_player_name,
             manager2TeamName: match.entry_2_name,
             manager2Points: match.entry_2_points,

@@ -602,8 +602,20 @@ function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
                     entry2Class = 'winner';
                 }
                 // Draw: no winner/loser classes
+                // Create data attributes for match details
+                const matchDataAttrs = `
+                    data-m1-entry="${match.manager1Entry}"
+                    data-m1-name="${escapeHtml(match.manager1Name)}"
+                    data-m1-team="${escapeHtml(match.manager1TeamName)}"
+                    data-m1-points="${match.manager1Points}"
+                    data-m2-entry="${match.manager2Entry}"
+                    data-m2-name="${escapeHtml(match.manager2Name)}"
+                    data-m2-team="${escapeHtml(match.manager2TeamName)}"
+                    data-m2-points="${match.manager2Points}"
+                    data-gameweek="${match.gameWeek}"
+                `;
                 html += `
-                    <div class="match-card">
+                    <div class="match-card clickable" ${matchDataAttrs}>
                         <div class="match-entry ${entry1Class} ${isEntry1Highlighted ? 'highlighted' : ''}">
                             <span class="team-name">${escapeHtml(match.manager1TeamName)}</span>
                             <span class="points">${match.manager1Points}</span>
@@ -623,6 +635,22 @@ function renderFilteredMatches(matches, gameweekFilter, managerFilter) {
         });
     }
     displayElement.innerHTML = html;
+    // Add click listeners to match cards
+    const matchCards = displayElement.querySelectorAll('.match-card.clickable');
+    matchCards.forEach(card => {
+        card.addEventListener('click', async () => {
+            const m1Entry = parseInt(card.getAttribute('data-m1-entry') || '0');
+            const m1Name = card.getAttribute('data-m1-name') || '';
+            const m1Team = card.getAttribute('data-m1-team') || '';
+            const m1Points = parseInt(card.getAttribute('data-m1-points') || '0');
+            const m2Entry = parseInt(card.getAttribute('data-m2-entry') || '0');
+            const m2Name = card.getAttribute('data-m2-name') || '';
+            const m2Team = card.getAttribute('data-m2-team') || '';
+            const m2Points = parseInt(card.getAttribute('data-m2-points') || '0');
+            const gameweek = parseInt(card.getAttribute('data-gameweek') || '0');
+            await showMatchDetails(m1Entry, m1Name, m1Team, m1Points, m2Entry, m2Name, m2Team, m2Points, gameweek);
+        });
+    });
 }
 /**
  * Populates Charts page
@@ -766,8 +794,10 @@ function populateTopScoresPage(element, data) {
             // Add manager 1's score
             allScores.push({
                 score: match.manager1Points,
+                managerEntry: match.manager1Entry,
                 managerName: match.manager1Name,
                 teamName: match.manager1TeamName,
+                opponentEntry: match.manager2Entry,
                 opponentName: match.manager2Name,
                 opponentTeamName: match.manager2TeamName,
                 opponentScore: match.manager2Points,
@@ -777,8 +807,10 @@ function populateTopScoresPage(element, data) {
             // Add manager 2's score
             allScores.push({
                 score: match.manager2Points,
+                managerEntry: match.manager2Entry,
                 managerName: match.manager2Name,
                 teamName: match.manager2TeamName,
+                opponentEntry: match.manager1Entry,
                 opponentName: match.manager1Name,
                 opponentTeamName: match.manager1TeamName,
                 opponentScore: match.manager1Points,
@@ -802,7 +834,16 @@ function populateTopScoresPage(element, data) {
         const resultClass = entry.result === 'W' ? 'win' : entry.result === 'D' ? 'draw' : 'loss';
         const resultEmoji = entry.result === 'W' ? '✅' : entry.result === 'D' ? '🤝' : '❌';
         html += `
-            <div class="top-score-card">
+            <div class="top-score-card clickable" 
+                data-manager1-entry="${entry.managerEntry}"
+                data-manager1-name="${escapeHtml(entry.managerName)}"
+                data-manager1-team="${escapeHtml(entry.teamName)}"
+                data-manager1-points="${entry.score}"
+                data-manager2-entry="${entry.opponentEntry}"
+                data-manager2-name="${escapeHtml(entry.opponentName)}"
+                data-manager2-team="${escapeHtml(entry.opponentTeamName)}"
+                data-manager2-points="${entry.opponentScore}"
+                data-gameweek="${entry.gameWeek}">
                 <div class="rank">${rankEmoji}</div>
                 <div class="score-details">
                     <div class="score-header">
@@ -827,6 +868,173 @@ function populateTopScoresPage(element, data) {
         </div>
     `;
     element.innerHTML = html;
+    // Add click listeners to top score cards
+    const scoreCards = element.querySelectorAll('.top-score-card.clickable');
+    scoreCards.forEach(card => {
+        card.addEventListener('click', async () => {
+            const m1Entry = parseInt(card.getAttribute('data-manager1-entry') || '0');
+            const m1Name = card.getAttribute('data-manager1-name') || '';
+            const m1Team = card.getAttribute('data-manager1-team') || '';
+            const m1Points = parseInt(card.getAttribute('data-manager1-points') || '0');
+            const m2Entry = parseInt(card.getAttribute('data-manager2-entry') || '0');
+            const m2Name = card.getAttribute('data-manager2-name') || '';
+            const m2Team = card.getAttribute('data-manager2-team') || '';
+            const m2Points = parseInt(card.getAttribute('data-manager2-points') || '0');
+            const gameweek = parseInt(card.getAttribute('data-gameweek') || '0');
+            await showMatchDetails(m1Entry, m1Name, m1Team, m1Points, m2Entry, m2Name, m2Team, m2Points, gameweek);
+        });
+    });
+}
+/**
+ * Shows detailed match information in a modal
+ */
+export async function showMatchDetails(manager1Entry, manager1Name, manager1TeamName, manager1Points, manager2Entry, manager2Name, manager2TeamName, manager2Points, gameweek) {
+    const { fetchMatchDetails } = await import('./api.js');
+    // Show loading modal
+    showMatchDetailsModal('Loading match details...', true);
+    try {
+        const matchData = await fetchMatchDetails(manager1Entry, manager1Name, manager1TeamName, manager1Points, manager2Entry, manager2Name, manager2TeamName, manager2Points, gameweek);
+        // Build detailed HTML
+        const html = buildMatchDetailsHTML(matchData);
+        showMatchDetailsModal(html, false);
+    }
+    catch (error) {
+        console.error('Failed to load match details:', error);
+        showMatchDetailsModal('<p class="error">Failed to load match details. Please try again.</p>', false);
+    }
+}
+/**
+ * Shows/updates the match details modal
+ */
+function showMatchDetailsModal(content, isLoading) {
+    let modal = document.getElementById('match-details-modal');
+    if (!modal) {
+        // Create modal
+        modal = document.createElement('div');
+        modal.id = 'match-details-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <button class="modal-close">&times;</button>
+                <div class="modal-body"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        // Close on overlay click
+        modal.querySelector('.modal-overlay')?.addEventListener('click', closeMatchDetailsModal);
+        modal.querySelector('.modal-close')?.addEventListener('click', closeMatchDetailsModal);
+    }
+    const modalBody = modal.querySelector('.modal-body');
+    if (modalBody) {
+        modalBody.innerHTML = isLoading
+            ? `<div class="loading-indicator active"><p>${content}</p></div>`
+            : content;
+    }
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+/**
+ * Closes the match details modal
+ */
+function closeMatchDetailsModal() {
+    const modal = document.getElementById('match-details-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+/**
+ * Builds HTML for match details display
+ */
+function buildMatchDetailsHTML(matchData) {
+    const { manager1TeamName, manager1Points, manager1Picks, manager2TeamName, manager2Points, manager2Picks, gameweek, liveData, playerInfo } = matchData;
+    // Determine winner/loser
+    const isManager1Winner = manager1Points > manager2Points;
+    const isManager2Winner = manager2Points > manager1Points;
+    // Create lookup map for live player stats
+    const liveStats = new Map();
+    liveData.elements.forEach((el) => {
+        liveStats.set(el.id, el.stats);
+    });
+    // Helper to get player details
+    const getPlayerDetails = (elementId) => {
+        const player = playerInfo.get(elementId);
+        const stats = liveStats.get(elementId);
+        return { player, stats };
+    };
+    // Helper to format team section
+    const buildTeamSection = (teamName, totalPoints, picks, chipUsed, isWinner, isLoser) => {
+        const { picks: playerPicks } = picks;
+        // Separate starting 11 and bench
+        const starting11 = playerPicks.filter((p) => p.position <= 11).sort((a, b) => a.position - b.position);
+        const bench = playerPicks.filter((p) => p.position > 11).sort((a, b) => a.position - b.position);
+        const winnerClass = isWinner ? 'winner' : isLoser ? 'loser' : '';
+        let html = `
+            <div class="team-section ${winnerClass}">
+                <div class="team-header">
+                    <h3>${escapeHtml(teamName)}</h3>
+                    <div class="team-points">${totalPoints} pts</div>
+                </div>
+        `;
+        if (chipUsed) {
+            html += `<div class="chip-badge">🎴 ${chipUsed}</div>`;
+        }
+        // Starting 11
+        html += `<h4 class="lineup-header">Starting XI</h4><div class="player-list">`;
+        starting11.forEach((pick) => {
+            const { player, stats } = getPlayerDetails(pick.element);
+            if (player && stats) {
+                const points = stats.total_points * pick.multiplier;
+                const isCaptain = pick.is_captain;
+                const isVice = pick.is_vice_captain;
+                html += `
+                    <div class="player-card">
+                        <div class="player-info">
+                            <span class="player-name">${escapeHtml(player.web_name)}${isCaptain ? ' (C)' : isVice ? ' (VC)' : ''}</span>
+                            <span class="player-details">${stats.minutes}' ${pick.multiplier > 1 ? `×${pick.multiplier} ` : ''}${stats.goals_scored > 0 ? `⚽${stats.goals_scored} ` : ''}${stats.assists > 0 ? `🅰️${stats.assists} ` : ''}${stats.clean_sheets > 0 ? '🥅 ' : ''}</span>
+                        </div>
+                        <div class="player-points ${points > 0 ? 'positive' : points < 0 ? 'negative' : ''}">${points}</div>
+                    </div>
+                `;
+            }
+        });
+        html += `</div>`;
+        // Bench
+        html += `<h4 class="lineup-header">Bench</h4><div class="player-list bench">`;
+        bench.forEach((pick) => {
+            const { player, stats } = getPlayerDetails(pick.element);
+            if (player && stats) {
+                html += `
+                    <div class="player-card bench-player">
+                        <div class="player-info">
+                            <span class="player-name">${escapeHtml(player.web_name)}</span>
+                            <span class="player-details">${stats.minutes}' ${stats.goals_scored > 0 ? `⚽${stats.goals_scored} ` : ''}${stats.assists > 0 ? `🅰️${stats.assists} ` : ''}</span>
+                        </div>
+                        <div class="player-points">${stats.total_points}</div>
+                    </div>
+                `;
+            }
+        });
+        html += `</div></div>`;
+        return html;
+    };
+    // Build complete HTML
+    let html = `
+        <div class="match-details-container">
+            <h2 class="match-title">Gameweek ${gameweek} Match Details</h2>
+            <div class="match-score">
+                <span class="score-team ${isManager1Winner ? 'winner' : isManager2Winner ? 'loser' : ''}">${escapeHtml(manager1TeamName)}</span>
+                <span class="score-numbers">${manager1Points} - ${manager2Points}</span>
+                <span class="score-team ${isManager2Winner ? 'winner' : isManager1Winner ? 'loser' : ''}">${escapeHtml(manager2TeamName)}</span>
+            </div>
+            <div class="teams-comparison">
+                ${buildTeamSection(manager1TeamName, manager1Points, manager1Picks, manager1Picks.active_chip, isManager1Winner, isManager2Winner)}
+                ${buildTeamSection(manager2TeamName, manager2Points, manager2Picks, manager2Picks.active_chip, isManager2Winner, isManager1Winner)}
+            </div>
+        </div>
+    `;
+    return html;
 }
 /**
  * Helper function to group matches by gameweek
