@@ -11,6 +11,9 @@ import { debounce } from './utils.js';
 // Wait for the page to fully load before running TypeScript
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Website loaded successfully with TypeScript!');
+    console.log('📍 Base URL:', document.querySelector('base')?.href || 'No base tag');
+    console.log('📂 Current location:', window.location.href);
+    console.log('🗂️ Script loaded from:', import.meta.url);
     initializeWebsite();
 });
 // Main initialization function
