@@ -5,7 +5,7 @@ const H2H_API_BASE_URL = `https://fantasy.premierleague.com/api/leagues-h2h-matc
 const H2H_STANDINGS_URL = `https://fantasy.premierleague.com/api/leagues-h2h/${H2H_LEAGUE_ID}/standings/`;
 // Configuration for cached static pages
 const CACHED_PAGES_COUNT = 3; // Number of pages we have cached locally
-const CACHED_PAGES_BASE_URL = '../data/cache/h2h-matches-page-'; // Relative to dist/
+const CACHED_PAGES_BASE_URL = 'data/cache/h2h-matches-page-'; // Relative to dist/
 const CORS_PROXIES = [
     'https://corsproxy.io/?', // Fast but may have rate limits
     'https://api.codetabs.com/v1/proxy?quest=',
