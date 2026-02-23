@@ -4,7 +4,7 @@
   "description": "Fantasy Premier League analytics dashboard for Friends Premier League Cup",
   "main": "index.html",
   "scripts": {
-    "build": "tsc && cp index.html dist/ && mkdir -p dist/css dist/data/cache dist/images && cp css/style.css dist/css/ && cp data/cache/*.json dist/data/cache/ && (cp images/* dist/images/ 2>/dev/null || true)",
+    "build": "tsc && cp index.html .nojekyll dist/ && mkdir -p dist/css dist/data/cache dist/images && cp css/style.css dist/css/ && cp data/cache/*.json dist/data/cache/ && (cp images/* dist/images/ 2>/dev/null || true)",
     "build:watch": "tsc --watch",
     "start": "npm run build && npx http-server dist -p 3000 -o",
     "dev": "npm run build:watch & npx http-server dist -p 3000",
