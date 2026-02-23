@@ -32,19 +32,6 @@ jobs:
       - name: Build TypeScript
         run: npm run build
         
-      - name: List dist contents
-        run: |
-          echo "=== Contents of dist folder ==="
-          ls -la dist/
-          echo "=== Contents of dist/css ==="
-          ls -la dist/css/ || echo "No css folder"
-          echo "=== Contents of dist/images ==="
-          ls -la dist/images/ || echo "No images folder"
-          echo "=== Contents of dist/data/cache ==="
-          ls -la dist/data/cache/ || echo "No cache folder"
-          echo "=== First 20 lines of dist/index.html ==="
-          head -20 dist/index.html
-        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
